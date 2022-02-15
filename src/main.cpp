@@ -231,7 +231,7 @@ void remove_offsets() {  // TODO: Integrate this with the heading, pitch and rol
             avg_y /= num;
             avg_z /= num;
 
-            int thres = 10;
+            int thres = 5;
             for (auto a: acc_biases_x) { if (abs((a - avg_x) > thres)){ within_range_x = false; } }
             for (auto b: acc_biases_y) { if (abs((b - avg_y) > thres)){ within_range_y = false; } }
             for (auto c: acc_biases_z) { if (abs((c - avg_z) > thres)){ within_range_z = false; } }
@@ -358,9 +358,6 @@ void loop() {
                           static_cast<double>(read1[10])/16,
                           static_cast<double>(read1[11])/16};
 
-    //Notice how I'm changing a thing and its being changed yeah
-
-
     // omitting quaternion data - i doubt i will use it.
     signed short read2[6] = {};
     READVECT(LIA_DATA_X, 6, 2, read2);
@@ -385,31 +382,34 @@ void loop() {
 
     //dead reckoning attempt
     unsigned long b = t1;
-    /*
+
     if ((counter>0) && (abs(lia_VECT[0]) > 0.2)){
         float est = kf.updateEstimate(lia_VECT[0]);
         x_vel += est*0.01;
         x_pos += x_vel*0.01;
         Serial.printf("XPOS:  %lf         lia:%lf\n", x_pos*100, est);
     }
-    */
+
 
 
     if (Serial) {
         for (int i = 0; i < 3; i++) {
-            Serial.printf("acc%d: %lf   ", i, acc_VECT[i]);
+            //Serial.printf("acc%d: %lf   ", i, acc_VECT[i]);
         }
         //Serial.printf("MAGnitude: %lf      ", mag_acc);
         for (int i = 0; i < 3; i++) {
-            Serial.printf("gyr: %d: %8.5lf,       ", i, gyr_VECT[i]);
+            //Serial.printf("grav%d: %8.5lf,  ", i, grav_VECT[i]);
         }
         //Serial.printf("MAGnitude: %lf      ", mag_grav);
         for (int i = 0; i < 3; i++) {
-            Serial.printf("ori%d: %lf   ", i, ori_VECT[i]);
+            //Serial.printf("lia%d: %lf  ", i, lia_VECT[i]);
         }
         //Serial.printf("MAGnitude: %lf      ", mag_lia);
+        for (int i = 0; i < 3; i++) {
+            //Serial.printf("ori%d: %lf  ", i, ori_VECT[i]);
+        }
 
-        Serial.println("\n");
+        //Serial.println("\n");
 
 
 
@@ -421,10 +421,6 @@ void loop() {
 
     delay(10 - (b - a) / 1000);
     counter ++;
-    
-    // RIGGGHT down at the bottom Im changing things from github.com
 
-
-    // I am now making a change on testbranch
 
 }
