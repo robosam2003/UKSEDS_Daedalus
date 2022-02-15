@@ -358,6 +358,8 @@ void loop() {
                           static_cast<double>(read1[10])/16,
                           static_cast<double>(read1[11])/16};
 
+    //Notice how I'm changing a thing and its being changed yeah
+
 
     // omitting quaternion data - i doubt i will use it.
     signed short read2[6] = {};
