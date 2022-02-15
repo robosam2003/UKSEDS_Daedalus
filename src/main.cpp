@@ -419,4 +419,6 @@ void loop() {
 
     delay(10 - (b - a) / 1000);
     counter ++;
+    
+    // RIGGGHT down at the bottom Im changing things from github.com
 }
