@@ -10,8 +10,6 @@ elapsedMillis tmillis;
 // Prototypes
 
 
-
-
 enum data{ // Read two bytes when neccessary
     ACC_OFFSET_X_LSB = 0x55,
     ACC_OFFSET_X_MSB = 0x56,
