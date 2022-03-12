@@ -7,7 +7,7 @@
 
 elapsedMicros t1;
 elapsedMillis tmillis;
-// Prototypes
+
 
 
 enum data{ // Read two bytes when neccessary
@@ -248,9 +248,9 @@ void remove_offsets() {  // TODO: Integrate this with the heading, pitch and rol
     }
 
 
-    byte acc_offset_addresses[6] = {ACC_OFFSET_X_LSB, ACC_OFFSET_X_MSB, ACC_OFFSET_Y_LSB, ACC_OFFSET_Y_MSB, ACC_OFFSET_Z_LSB, ACC_OFFSET_Z_MSB};
-    byte mag_offset_addresses[6] = {MAG_OFFSET_X_LSB, MAG_OFFSET_X_MSB, MAG_OFFSET_Y_LSB, MAG_OFFSET_Y_MSB, MAG_OFFSET_Z_LSB, MAG_OFFSET_Z_MSB};
-    byte gyr_offset_addresses[6] = {GYR_OFFSET_X_LSB, GYR_OFFSET_X_MSB, GYR_OFFSET_Y_LSB, GYR_OFFSET_Y_MSB, GYR_OFFSET_Z_LSB, GYR_OFFSET_Z_MSB};
+    //byte acc_offset_addresses[6] = {ACC_OFFSET_X_LSB, ACC_OFFSET_X_MSB, ACC_OFFSET_Y_LSB, ACC_OFFSET_Y_MSB, ACC_OFFSET_Z_LSB, ACC_OFFSET_Z_MSB};
+    //byte mag_offset_addresses[6] = {MAG_OFFSET_X_LSB, MAG_OFFSET_X_MSB, MAG_OFFSET_Y_LSB, MAG_OFFSET_Y_MSB, MAG_OFFSET_Z_LSB, MAG_OFFSET_Z_MSB};
+    //byte gyr_offset_addresses[6] = {GYR_OFFSET_X_LSB, GYR_OFFSET_X_MSB, GYR_OFFSET_Y_LSB, GYR_OFFSET_Y_MSB, GYR_OFFSET_Z_LSB, GYR_OFFSET_Z_MSB};
 
     signed short addresses[3][9] = {{ACC_OFFSET_X_LSB, ACC_OFFSET_X_MSB,
                                             ACC_OFFSET_Y_LSB, ACC_OFFSET_Y_MSB,
@@ -316,6 +316,7 @@ void remove_offsets() {  // TODO: Integrate this with the heading, pitch and rol
 
 void setup(void) {
     delay(2000);
+    Serial.begin(9600);
     Wire.begin();
     pinMode(LED_BUILTIN, OUTPUT);
     init();
@@ -381,33 +382,28 @@ void loop() {
     //dead reckoning attempt
     unsigned long b = t1;
 
-    if ((counter>0) && (abs(lia_VECT[0]) > 0.2)){
-        float est = kf.updateEstimate(lia_VECT[0]);
-        x_vel += est*0.01;
-        x_pos += x_vel*0.01;
-        Serial.printf("XPOS:  %lf         lia:%lf\n", x_pos*100, est);
-    }
+
 
 
 
     if (Serial) {
         for (int i = 0; i < 3; i++) {
-            //Serial.printf("acc%d: %lf   ", i, acc_VECT[i]);
+            Serial.printf("acc%d: %lf   ", i, acc_VECT[i]);
         }
         //Serial.printf("MAGnitude: %lf      ", mag_acc);
         for (int i = 0; i < 3; i++) {
-            //Serial.printf("grav%d: %8.5lf,  ", i, grav_VECT[i]);
+            Serial.printf("grav%d: %8.5lf,  ", i, grav_VECT[i]);
         }
         //Serial.printf("MAGnitude: %lf      ", mag_grav);
         for (int i = 0; i < 3; i++) {
-            //Serial.printf("lia%d: %lf  ", i, lia_VECT[i]);
+            Serial.printf("lia%d: %lf  ", i, lia_VECT[i]);
         }
         //Serial.printf("MAGnitude: %lf      ", mag_lia);
         for (int i = 0; i < 3; i++) {
-            //Serial.printf("ori%d: %lf  ", i, ori_VECT[i]);
+            Serial.printf("ori%d: %lf  ", i, ori_VECT[i]);
         }
 
-        //Serial.println("\n");
+        Serial.println("\n");
 
 
 
