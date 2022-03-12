@@ -1,11 +1,9 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <SimpleKalmanFilter.h>
-#include <cmath>
 
 
 #define ADR_SENS 0x28
-
 #define pi 3.14159265359
 
 elapsedMicros t1;
@@ -170,7 +168,6 @@ byte calibrate() {
     delay(3000);
     return calstat;
 }
-
 void calcRotationVect(signed short acc_meas[3], signed short ori[3], double returnVect[3]){ // calculates the absolute acceleration (relative to north and flat) based on acceleration data and orientation data
     double degToRad = (2*pi)/360;
     double roll = ori[2]*degToRad; // in radians
@@ -199,6 +196,7 @@ void calcRotationVect(signed short acc_meas[3], signed short ori[3], double retu
 
 
 
+
 void init() {
     delay(2000);
     REGSET(OPR_MODE, 0b00000000); // CONFIG MODE
@@ -217,74 +215,66 @@ void init() {
     REGSET(OPR_MODE, 0b00001100); // NdoF mode
 }
 
-void remove_offsets() {  // TODO: Integrate this with the heading, pitch and roll to get true biases (for if calibration is done on a slope).
+void remove_offsets() {  // Adds a constant offset now, uncomment code to get new calibration data, sam knows what to do.
     bool offsets_calibrated = false;
     int counter = 0;
 
     const int num = 100;
-
-    double acc_biases_x[num] = {0};
-    double acc_biases_y[num] = {0};
-    double acc_biases_z[num] = {0};
+    signed short acc_biases_x[num] = {0};
+    signed short acc_biases_y[num] = {0};
+    signed short acc_biases_z[num] = {0};
 
     REGSET(OPR_MODE, 0b00000000); //config mode
     delay(20);
-    REGSET(ACC_OFFSET_X_LSB, 0); // reset offsets
+    REGSET(ACC_OFFSET_X_LSB, 0);
     REGSET(ACC_OFFSET_X_MSB, 0);
     REGSET(ACC_OFFSET_Y_LSB, 0);
     REGSET(ACC_OFFSET_Y_MSB, 0);
     REGSET(ACC_OFFSET_Z_LSB, 0);
     REGSET(ACC_OFFSET_Z_MSB, 0);
 
-    REGSET(OPR_MODE, 0b00001100); // NDOF mode for reading
+    REGSET(OPR_MODE, 0b00001100); // NDOF for reading
 
-    double avg_x=0, avg_y=0, avg_z=0;
+    int avg_x=-29, avg_y=8, avg_z=-30;
 
-
+    /*
     while (!offsets_calibrated) {
         signed short acc_offset_VECT[3] = {};
-        signed short ori_VECT[3] = {};
         READVECT(ACC_DATA_X, 3, 2, acc_offset_VECT);
-        READVECT(EUL_HEADING, 3, 2, ori_VECT);
-
-        double absoluteAccVect[3] = {};
-        calcRotationVect(acc_offset_VECT, ori_VECT, absoluteAccVect);
-
-
-        acc_biases_x[counter % num] = absoluteAccVect[0];
-        acc_biases_y[counter % num] = absoluteAccVect[1];
-        acc_biases_z[counter % num] = absoluteAccVect[2];
+        acc_biases_x[counter % num] = acc_offset_VECT[0];
+        acc_biases_y[counter % num] = acc_offset_VECT[1];
+        acc_biases_z[counter % num] = acc_offset_VECT[2];
         bool within_range_x = true;
         bool within_range_y = true;
         bool within_range_z = true;
         if (counter > (2*num)) {
 
-            for (double ax: acc_biases_x) { avg_x += ax; }
-            for (double ay: acc_biases_y) { avg_y += ay; }
-            for (double az: acc_biases_z) { avg_z += az; }
+            for (short ax: acc_biases_x) { avg_x += ax; }
+            for (short ay: acc_biases_y) { avg_y += ay; }
+            for (short az: acc_biases_z) { avg_z += az; }
 
             avg_x /= num;
             avg_y /= num;
             avg_z /= num;
 
             int thres = 5;
-            for (auto a: acc_biases_x) { if (std::abs((a - avg_x)) > thres){ within_range_x = false; } }
-            for (auto b: acc_biases_y) { if (std::abs((b - avg_y)) > thres){ within_range_y = false; } }
-            for (auto c: acc_biases_z) { if (std::abs((c - avg_z)) > thres){ within_range_z = false; } }
+            for (auto a: acc_biases_x) { if (abs((a - avg_x) > thres)){ within_range_x = false; } }
+            for (auto b: acc_biases_y) { if (abs((b - avg_y) > thres)){ within_range_y = false; } }
+            for (auto c: acc_biases_z) { if (abs((c - avg_z) > thres)){ within_range_z = false; } }
             if ((within_range_x & within_range_y) & within_range_z) {
                 avg_z -= 980; // for if you are using acc data
-
+                //avg_z = -avg_z;
                 offsets_calibrated = true;
 
             }
         }
         counter++;
 
-        if (Serial) { for (auto x:acc_offset_VECT) { Serial.printf("%d,     ", x ) ;} Serial.printf("%lf, %lf, %lf       %d, %d, %d, %d    \n", avg_x, avg_y, avg_z, (counter>num), within_range_x, within_range_y, within_range_z); }
+        if (Serial) { for (auto x:acc_offset_VECT) { Serial.printf("%d,     ", x ) ;} Serial.printf("%d, %d, %d       %d, %d, %d, %d    \n", avg_x, avg_y, avg_z, (counter>num), within_range_x, within_range_y, within_range_z); }
         delay(10);
 
     }
-
+    */
 
     //byte acc_offset_addresses[6] = {ACC_OFFSET_X_LSB, ACC_OFFSET_X_MSB, ACC_OFFSET_Y_LSB, ACC_OFFSET_Y_MSB, ACC_OFFSET_Z_LSB, ACC_OFFSET_Z_MSB};
     //byte mag_offset_addresses[6] = {MAG_OFFSET_X_LSB, MAG_OFFSET_X_MSB, MAG_OFFSET_Y_LSB, MAG_OFFSET_Y_MSB, MAG_OFFSET_Z_LSB, MAG_OFFSET_Z_MSB};
@@ -381,8 +371,7 @@ void loop() {
     READVECT(ACC_DATA_X, 12, 2, read1);
     double acc_VECT[3] = {static_cast<double>(read1[0])/100,
                           static_cast<double>(read1[1])/100,
-                          static_cast<double>(read1[2])/100};
-
+                          static_cast<double>(read1[2])/100}; // WHY 655
 
     double mag_VECT[3] = {static_cast<double>(read1[3]),
                           static_cast<double>(read1[4]),
@@ -405,7 +394,6 @@ void loop() {
     double grav_VECT[3] = {static_cast<double>(read2[3])/100,
                            static_cast<double>(read2[4])/100,
                            static_cast<double>(read2[5])/100};
-    double absAccVect[3] = {};
 
 
 
