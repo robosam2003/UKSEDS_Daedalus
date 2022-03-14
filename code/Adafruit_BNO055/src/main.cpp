@@ -168,11 +168,12 @@ byte calibrate() {
     delay(3000);
     return calstat;
 }
-void calcRotationVect(signed short acc_meas[3], signed short ori[3], double returnVect[3]){ // calculates the absolute acceleration (relative to north and flat) based on acceleration data and orientation data
-    double degToRad = (2*pi)/360;
-    double roll = ori[2]*degToRad; // in radians
-    double pitch = ori[1]*degToRad; // in radians
-    double heading = ori[0]*degToRad; // in radians
+
+void calcRotationVect(double acc_meas[3], double ori[3], double returnVect[3]){ // calculates the absolute acceleration (relative to north and flat) based on acceleration data and orientation data
+    //double degToRad = (2*pi)/360;
+    double roll = ori[2]; // in radians
+    double pitch = ori[1]; // in radians
+    double heading = ori[0]; // in radians
 
     double rotMatX[3][3] = { {1, 0,          0         },
                              {0, cos(roll),  -sin(roll) },
@@ -186,11 +187,24 @@ void calcRotationVect(signed short acc_meas[3], signed short ori[3], double retu
                              { sin(heading), cos(heading),  0 },
                              { 0,            0,             1} };
 
+    double vec1[3] = {};
+    double vec2[3] = {};
     for (int i=0; i<3; i++) {
         for (int j=0; j<3; j++) {
-            returnVect[i] += rotMatZ[i][j]*rotMatY[i][j]*rotMatX[i][j]*acc_meas[i];
+            vec1[i] += rotMatX[i][j]*acc_meas[j];
         }
     }
+    for (int i=0; i<3; i++) {
+        for (int j=0; j<3; j++) {
+            vec2[i] += rotMatY[i][j]*vec1[j];
+        }
+    }
+    for (int i=0; i<3; i++) {
+        for (int j=0; j<3; j++) {
+            returnVect[i] += rotMatZ[i][j]*vec2[j];
+        }
+    }
+
 
 }
 
@@ -208,7 +222,7 @@ void init() {
 
     REGSET(PWR_MODE, 0b00000000); // normal mode
 
-    REGSET(UNIT_SEL, 0b00000000); //Celcius, degrees, dps, m/s^2
+    REGSET(UNIT_SEL, 0b00000110); //Celcius, degrees, dps, m/s^2
 
     REGSET(AXIS_MAP_CONFIG, 0b00100100);
     REGSET(AXIS_MAP_SIGN, 0b00000000);
@@ -348,7 +362,7 @@ void setup(void) {
     Wire.begin();
     pinMode(LED_BUILTIN, OUTPUT);
     init();
-    calibrate();
+    //calibrate();
     remove_offsets();
 
     delay(1000);
@@ -358,7 +372,11 @@ void setup(void) {
 
 int counter = 0;
 
-SimpleKalmanFilter kf = SimpleKalmanFilter(0.1, 0.1, 0.01);
+
+SimpleKalmanFilter trueAccKfX = SimpleKalmanFilter(0.05, 0.05, 0.01);
+SimpleKalmanFilter trueAccKfY = SimpleKalmanFilter(0.05, 0.05, 0.01);
+SimpleKalmanFilter trueAccKfZ = SimpleKalmanFilter(0.05, 0.05, 0.01);
+
 double x_pos=0, y_pos=0, z_pos=0;
 double x_vel=0, y_vel=0, z_vel=0;
 
@@ -381,9 +399,9 @@ void loop() {
                           static_cast<double>(read1[7])/900,
                           static_cast<double>(read1[8])/900}; // /900 for rps,   /16 for dps
 
-    double ori_VECT[3] = {static_cast<double>(read1[9])/16,
-                          static_cast<double>(read1[10])/16,
-                          static_cast<double>(read1[11])/16};
+    double ori_VECT[3] = {(2*pi)-(static_cast<double>(read1[9])/900),
+                          -(static_cast<double>(read1[10])/900),
+                          static_cast<double>(read1[11])/900}; // radians
 
     // omitting quaternion data - i doubt i will use it.
     signed short read2[6] = {};
@@ -407,6 +425,10 @@ void loop() {
     double mag_grav = sqrt(pow(grav_VECT[0], 2) + pow(grav_VECT[1], 2) + pow(grav_VECT[2], 2));
     double mag_lia = sqrt(pow(lia_VECT[0], 2) + pow(lia_VECT[1], 2) + pow(lia_VECT[2], 2));
 
+    double trueAccVect[3] = {};
+    calcRotationVect(acc_VECT, ori_VECT, trueAccVect);
+    SimpleKalmanFilter trueAccVectKf[3] = {trueAccKfX, trueAccKfY, trueAccKfZ};
+    for (int i=0; i<3; i++) { trueAccVectKf[i].updateEstimate(static_cast<float>(trueAccVect[i])); }
     //dead reckoning attempt
     unsigned long b = t1;
 
@@ -416,15 +438,15 @@ void loop() {
 
     if (Serial) {
         for (int i = 0; i < 3; i++) {
-            Serial.printf("acc%d: %lf   ", i, acc_VECT[i]);
+            //Serial.printf("acc%d: %lf   ", i, acc_VECT[i]);
         }
         //Serial.printf("MAGnitude: %lf      ", mag_acc);
         for (int i = 0; i < 3; i++) {
-            Serial.printf("grav%d: %8.5lf,  ", i, grav_VECT[i]);
+            //Serial.printf("grav%d: %8.5lf,  ", i, grav_VECT[i]);
         }
         //Serial.printf("MAGnitude: %lf      ", mag_grav);
         for (int i = 0; i < 3; i++) {
-            Serial.printf("lia%d: %lf  ", i, lia_VECT[i]);
+            Serial.printf("tav%d: %lf  ", i, trueAccVect[i]);
         }
         //Serial.printf("MAGnitude: %lf      ", mag_lia);
         for (int i = 0; i < 3; i++) {
