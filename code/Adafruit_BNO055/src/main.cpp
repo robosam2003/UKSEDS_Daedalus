@@ -229,14 +229,14 @@ void init() {
     REGSET(OPR_MODE, 0b00001100); // NdoF mode
 }
 
-void remove_offsets() {  // Adds a constant offset now, uncomment code to get new calibration data, sam knows what to do.
+void remove_offsets() {
     bool offsets_calibrated = false;
     int counter = 0;
 
     const int num = 100;
-    signed short acc_biases_x[num] = {0};
-    signed short acc_biases_y[num] = {0};
-    signed short acc_biases_z[num] = {0};
+    double acc_biases_x[num] = {0};
+    double acc_biases_y[num] = {0};
+    double acc_biases_z[num] = {0};
 
     REGSET(OPR_MODE, 0b00000000); //config mode
     delay(20);
@@ -249,23 +249,29 @@ void remove_offsets() {  // Adds a constant offset now, uncomment code to get ne
 
     REGSET(OPR_MODE, 0b00001100); // NDOF for reading
 
-    int avg_x=-29, avg_y=8, avg_z=-30;
+    double avg_x=0, avg_y=0, avg_z=-0;
 
-    /*
+
     while (!offsets_calibrated) {
         signed short acc_offset_VECT[3] = {};
         READVECT(ACC_DATA_X, 3, 2, acc_offset_VECT);
-        acc_biases_x[counter % num] = acc_offset_VECT[0];
-        acc_biases_y[counter % num] = acc_offset_VECT[1];
-        acc_biases_z[counter % num] = acc_offset_VECT[2];
+        signed short ori_VECT[3] = {};
+        READVECT(EUL_HEADING, 3, 2, ori_VECT);
+        for (auto i : ori_VECT) { i /= 900; } // radians
+        double trueAccVect[3] = {};
+        calcRotationVect(reinterpret_cast<double *>(acc_offset_VECT), reinterpret_cast<double *>(ori_VECT), trueAccVect);
+
+        acc_biases_x[counter % num] = trueAccVect[0];
+        acc_biases_y[counter % num] = trueAccVect[1];
+        acc_biases_z[counter % num] = trueAccVect[2];
         bool within_range_x = true;
         bool within_range_y = true;
         bool within_range_z = true;
         if (counter > (2*num)) {
 
-            for (short ax: acc_biases_x) { avg_x += ax; }
-            for (short ay: acc_biases_y) { avg_y += ay; }
-            for (short az: acc_biases_z) { avg_z += az; }
+            for (auto ax: acc_biases_x) { avg_x += ax; }
+            for (auto ay: acc_biases_y) { avg_y += ay; }
+            for (auto az: acc_biases_z) { avg_z += az; }
 
             avg_x /= num;
             avg_y /= num;
@@ -276,6 +282,12 @@ void remove_offsets() {  // Adds a constant offset now, uncomment code to get ne
             for (auto b: acc_biases_y) { if (abs((b - avg_y) > thres)){ within_range_y = false; } }
             for (auto c: acc_biases_z) { if (abs((c - avg_z) > thres)){ within_range_z = false; } }
             if ((within_range_x & within_range_y) & within_range_z) {
+
+                double lambda = 980/ (sq(avg_x) + sq(avg_y)+ sq(avg_z));
+                avg_x *= lambda;
+                avg_y *= lambda;
+                avg_z *= lambda;
+
                 avg_z -= 980; // for if you are using acc data
                 //avg_z = -avg_z;
                 offsets_calibrated = true;
@@ -284,11 +296,11 @@ void remove_offsets() {  // Adds a constant offset now, uncomment code to get ne
         }
         counter++;
 
-        if (Serial) { for (auto x:acc_offset_VECT) { Serial.printf("%d,     ", x ) ;} Serial.printf("%d, %d, %d       %d, %d, %d, %d    \n", avg_x, avg_y, avg_z, (counter>num), within_range_x, within_range_y, within_range_z); }
+        if (Serial) { for (auto x:acc_offset_VECT) { Serial.printf("%d,     ", x ) ;} Serial.printf("%lf, %lf, %lf       %d, %d, %d, %d    \n", avg_x, avg_y, avg_z, (counter>num), within_range_x, within_range_y, within_range_z); }
         delay(10);
 
     }
-    */
+
 
     //byte acc_offset_addresses[6] = {ACC_OFFSET_X_LSB, ACC_OFFSET_X_MSB, ACC_OFFSET_Y_LSB, ACC_OFFSET_Y_MSB, ACC_OFFSET_Z_LSB, ACC_OFFSET_Z_MSB};
     //byte mag_offset_addresses[6] = {MAG_OFFSET_X_LSB, MAG_OFFSET_X_MSB, MAG_OFFSET_Y_LSB, MAG_OFFSET_Y_MSB, MAG_OFFSET_Z_LSB, MAG_OFFSET_Z_MSB};
@@ -362,7 +374,7 @@ void setup(void) {
     Wire.begin();
     pinMode(LED_BUILTIN, OUTPUT);
     init();
-    //calibrate();
+    calibrate();
     remove_offsets();
 
     delay(1000);
@@ -376,6 +388,8 @@ int counter = 0;
 SimpleKalmanFilter trueAccKfX = SimpleKalmanFilter(0.05, 0.05, 0.01);
 SimpleKalmanFilter trueAccKfY = SimpleKalmanFilter(0.05, 0.05, 0.01);
 SimpleKalmanFilter trueAccKfZ = SimpleKalmanFilter(0.05, 0.05, 0.01);
+SimpleKalmanFilter AccKF[3] = {trueAccKfX, trueAccKfY, trueAccKfZ};
+float trueAccVectKf[3] = {};
 
 double x_pos=0, y_pos=0, z_pos=0;
 double x_vel=0, y_vel=0, z_vel=0;
@@ -427,8 +441,8 @@ void loop() {
 
     double trueAccVect[3] = {};
     calcRotationVect(acc_VECT, ori_VECT, trueAccVect);
-    SimpleKalmanFilter trueAccVectKf[3] = {trueAccKfX, trueAccKfY, trueAccKfZ};
-    for (int i=0; i<3; i++) { trueAccVectKf[i].updateEstimate(static_cast<float>(trueAccVect[i])); }
+
+    for (int i=0; i<3; i++) { trueAccVectKf[i] =  AccKF[i].updateEstimate(static_cast<float>(trueAccVect[i])); }
     //dead reckoning attempt
     unsigned long b = t1;
 
@@ -438,16 +452,20 @@ void loop() {
 
     if (Serial) {
         for (int i = 0; i < 3; i++) {
-            //Serial.printf("acc%d: %lf   ", i, acc_VECT[i]);
+            Serial.printf("acc%d: %lf   ", i, acc_VECT[i]);
         }
         //Serial.printf("MAGnitude: %lf      ", mag_acc);
         for (int i = 0; i < 3; i++) {
-            //Serial.printf("grav%d: %8.5lf,  ", i, grav_VECT[i]);
+            Serial.printf("grav%d: %8.5lf,  ", i, grav_VECT[i]);
         }
         //Serial.printf("MAGnitude: %lf      ", mag_grav);
-        for (int i = 0; i < 3; i++) {
+        for (int i = 2; i < 3; i++) {
             Serial.printf("tav%d: %lf  ", i, trueAccVect[i]);
         }
+        for (int i = 2; i < 3; i++) {
+            Serial.printf("tavkf%d: %lf  ", i, trueAccVectKf[i]);
+        }
+
         //Serial.printf("MAGnitude: %lf      ", mag_lia);
         for (int i = 0; i < 3; i++) {
             Serial.printf("ori%d: %lf  ", i, ori_VECT[i]);
