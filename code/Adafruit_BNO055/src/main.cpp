@@ -4,10 +4,11 @@
 
 
 #define ADR_SENS 0x28
+#define pi 3.14159265359
 
 elapsedMicros t1;
 elapsedMillis tmillis;
-// Prototypes
+
 
 
 enum data{ // Read two bytes when neccessary
@@ -168,6 +169,47 @@ byte calibrate() {
     return calstat;
 }
 
+void calcRotationVect(double acc_meas[3], double ori[3], double returnVect[3]){ // calculates the absolute acceleration (relative to north and flat) based on acceleration data and orientation data
+    //double degToRad = (2*pi)/360;
+    double roll = ori[2]; // in radians
+    double pitch = ori[1]; // in radians
+    double heading = ori[0]; // in radians
+
+    double rotMatX[3][3] = { {1, 0,          0         },
+                             {0, cos(roll),  -sin(roll) },
+                             {0, sin(roll), cos(roll) } };
+
+    double rotMatY[3][3] = { { cos(pitch),  0, sin(pitch) },
+                             { 0,           1, 0          },
+                             { -sin(pitch), 0, cos(pitch) } };
+
+    double rotMatZ[3][3] = { { cos(heading), -sin(heading), 0 },
+                             { sin(heading), cos(heading),  0 },
+                             { 0,            0,             1} };
+
+    double vec1[3] = {};
+    double vec2[3] = {};
+    for (int i=0; i<3; i++) {
+        for (int j=0; j<3; j++) {
+            vec1[i] += rotMatX[i][j]*acc_meas[j];
+        }
+    }
+    for (int i=0; i<3; i++) {
+        for (int j=0; j<3; j++) {
+            vec2[i] += rotMatY[i][j]*vec1[j];
+        }
+    }
+    for (int i=0; i<3; i++) {
+        for (int j=0; j<3; j++) {
+            returnVect[i] += rotMatZ[i][j]*vec2[j];
+        }
+    }
+
+
+}
+
+
+
 
 void init() {
     delay(2000);
@@ -180,21 +222,21 @@ void init() {
 
     REGSET(PWR_MODE, 0b00000000); // normal mode
 
-    REGSET(UNIT_SEL, 0b00000000); //Celcius, degrees, dps, m/s^2
+    REGSET(UNIT_SEL, 0b00000110); //Celcius, degrees, dps, m/s^2
 
     REGSET(AXIS_MAP_CONFIG, 0b00100100);
     REGSET(AXIS_MAP_SIGN, 0b00000000);
     REGSET(OPR_MODE, 0b00001100); // NdoF mode
 }
 
-void remove_offsets() {  // TODO: Integrate this with the heading, pitch and roll to get true biases (for if calibration is done on a slope).
+void remove_offsets() {
     bool offsets_calibrated = false;
     int counter = 0;
 
     const int num = 100;
-    signed short acc_biases_x[num] = {0};
-    signed short acc_biases_y[num] = {0};
-    signed short acc_biases_z[num] = {0};
+    double acc_biases_x[num] = {0};
+    double acc_biases_y[num] = {0};
+    double acc_biases_z[num] = {0};
 
     REGSET(OPR_MODE, 0b00000000); //config mode
     delay(20);
@@ -207,23 +249,29 @@ void remove_offsets() {  // TODO: Integrate this with the heading, pitch and rol
 
     REGSET(OPR_MODE, 0b00001100); // NDOF for reading
 
-    int avg_x=0, avg_y=0, avg_z=0;
+    double avg_x=0, avg_y=0, avg_z=-0;
 
 
     while (!offsets_calibrated) {
         signed short acc_offset_VECT[3] = {};
         READVECT(ACC_DATA_X, 3, 2, acc_offset_VECT);
-        acc_biases_x[counter % num] = acc_offset_VECT[0];
-        acc_biases_y[counter % num] = acc_offset_VECT[1];
-        acc_biases_z[counter % num] = acc_offset_VECT[2];
+        signed short ori_VECT[3] = {};
+        READVECT(EUL_HEADING, 3, 2, ori_VECT);
+        for (auto i : ori_VECT) { i /= 900; } // radians
+        double trueAccVect[3] = {};
+        calcRotationVect(reinterpret_cast<double *>(acc_offset_VECT), reinterpret_cast<double *>(ori_VECT), trueAccVect);
+
+        acc_biases_x[counter % num] = trueAccVect[0];
+        acc_biases_y[counter % num] = trueAccVect[1];
+        acc_biases_z[counter % num] = trueAccVect[2];
         bool within_range_x = true;
         bool within_range_y = true;
         bool within_range_z = true;
         if (counter > (2*num)) {
 
-            for (short ax: acc_biases_x) { avg_x += ax; }
-            for (short ay: acc_biases_y) { avg_y += ay; }
-            for (short az: acc_biases_z) { avg_z += az; }
+            for (auto ax: acc_biases_x) { avg_x += ax; }
+            for (auto ay: acc_biases_y) { avg_y += ay; }
+            for (auto az: acc_biases_z) { avg_z += az; }
 
             avg_x /= num;
             avg_y /= num;
@@ -234,6 +282,12 @@ void remove_offsets() {  // TODO: Integrate this with the heading, pitch and rol
             for (auto b: acc_biases_y) { if (abs((b - avg_y) > thres)){ within_range_y = false; } }
             for (auto c: acc_biases_z) { if (abs((c - avg_z) > thres)){ within_range_z = false; } }
             if ((within_range_x & within_range_y) & within_range_z) {
+
+                double lambda = 980/ (sq(avg_x) + sq(avg_y)+ sq(avg_z));
+                avg_x *= lambda;
+                avg_y *= lambda;
+                avg_z *= lambda;
+
                 avg_z -= 980; // for if you are using acc data
                 //avg_z = -avg_z;
                 offsets_calibrated = true;
@@ -242,15 +296,15 @@ void remove_offsets() {  // TODO: Integrate this with the heading, pitch and rol
         }
         counter++;
 
-        if (Serial) { for (auto x:acc_offset_VECT) { Serial.printf("%d,     ", x ) ;} Serial.printf("%d, %d, %d       %d, %d, %d, %d    \n", avg_x, avg_y, avg_z, (counter>num), within_range_x, within_range_y, within_range_z); }
+        if (Serial) { for (auto x:acc_offset_VECT) { Serial.printf("%d,     ", x ) ;} Serial.printf("%lf, %lf, %lf       %d, %d, %d, %d    \n", avg_x, avg_y, avg_z, (counter>num), within_range_x, within_range_y, within_range_z); }
         delay(10);
 
     }
 
 
-    byte acc_offset_addresses[6] = {ACC_OFFSET_X_LSB, ACC_OFFSET_X_MSB, ACC_OFFSET_Y_LSB, ACC_OFFSET_Y_MSB, ACC_OFFSET_Z_LSB, ACC_OFFSET_Z_MSB};
-    byte mag_offset_addresses[6] = {MAG_OFFSET_X_LSB, MAG_OFFSET_X_MSB, MAG_OFFSET_Y_LSB, MAG_OFFSET_Y_MSB, MAG_OFFSET_Z_LSB, MAG_OFFSET_Z_MSB};
-    byte gyr_offset_addresses[6] = {GYR_OFFSET_X_LSB, GYR_OFFSET_X_MSB, GYR_OFFSET_Y_LSB, GYR_OFFSET_Y_MSB, GYR_OFFSET_Z_LSB, GYR_OFFSET_Z_MSB};
+    //byte acc_offset_addresses[6] = {ACC_OFFSET_X_LSB, ACC_OFFSET_X_MSB, ACC_OFFSET_Y_LSB, ACC_OFFSET_Y_MSB, ACC_OFFSET_Z_LSB, ACC_OFFSET_Z_MSB};
+    //byte mag_offset_addresses[6] = {MAG_OFFSET_X_LSB, MAG_OFFSET_X_MSB, MAG_OFFSET_Y_LSB, MAG_OFFSET_Y_MSB, MAG_OFFSET_Z_LSB, MAG_OFFSET_Z_MSB};
+    //byte gyr_offset_addresses[6] = {GYR_OFFSET_X_LSB, GYR_OFFSET_X_MSB, GYR_OFFSET_Y_LSB, GYR_OFFSET_Y_MSB, GYR_OFFSET_Z_LSB, GYR_OFFSET_Z_MSB};
 
     signed short addresses[3][9] = {{ACC_OFFSET_X_LSB, ACC_OFFSET_X_MSB,
                                             ACC_OFFSET_Y_LSB, ACC_OFFSET_Y_MSB,
@@ -316,6 +370,7 @@ void remove_offsets() {  // TODO: Integrate this with the heading, pitch and rol
 
 void setup(void) {
     delay(2000);
+    Serial.begin(9600);
     Wire.begin();
     pinMode(LED_BUILTIN, OUTPUT);
     init();
@@ -329,7 +384,13 @@ void setup(void) {
 
 int counter = 0;
 
-SimpleKalmanFilter kf = SimpleKalmanFilter(0.1, 0.1, 0.01);
+
+SimpleKalmanFilter trueAccKfX = SimpleKalmanFilter(0.05, 0.05, 0.01);
+SimpleKalmanFilter trueAccKfY = SimpleKalmanFilter(0.05, 0.05, 0.01);
+SimpleKalmanFilter trueAccKfZ = SimpleKalmanFilter(0.05, 0.05, 0.01);
+SimpleKalmanFilter AccKF[3] = {trueAccKfX, trueAccKfY, trueAccKfZ};
+float trueAccVectKf[3] = {};
+
 double x_pos=0, y_pos=0, z_pos=0;
 double x_vel=0, y_vel=0, z_vel=0;
 
@@ -352,9 +413,9 @@ void loop() {
                           static_cast<double>(read1[7])/900,
                           static_cast<double>(read1[8])/900}; // /900 for rps,   /16 for dps
 
-    double ori_VECT[3] = {static_cast<double>(read1[9])/16,
-                          static_cast<double>(read1[10])/16,
-                          static_cast<double>(read1[11])/16};
+    double ori_VECT[3] = {(2*pi)-(static_cast<double>(read1[9])/900),
+                          -(static_cast<double>(read1[10])/900),
+                          static_cast<double>(read1[11])/900}; // radians
 
     // omitting quaternion data - i doubt i will use it.
     signed short read2[6] = {};
@@ -378,36 +439,39 @@ void loop() {
     double mag_grav = sqrt(pow(grav_VECT[0], 2) + pow(grav_VECT[1], 2) + pow(grav_VECT[2], 2));
     double mag_lia = sqrt(pow(lia_VECT[0], 2) + pow(lia_VECT[1], 2) + pow(lia_VECT[2], 2));
 
+    double trueAccVect[3] = {};
+    calcRotationVect(acc_VECT, ori_VECT, trueAccVect);
+
+    for (int i=0; i<3; i++) { trueAccVectKf[i] =  AccKF[i].updateEstimate(static_cast<float>(trueAccVect[i])); }
     //dead reckoning attempt
     unsigned long b = t1;
 
-    if ((counter>0) && (abs(lia_VECT[0]) > 0.2)){
-        float est = kf.updateEstimate(lia_VECT[0]);
-        x_vel += est*0.01;
-        x_pos += x_vel*0.01;
-        Serial.printf("XPOS:  %lf         lia:%lf\n", x_pos*100, est);
-    }
+
 
 
 
     if (Serial) {
         for (int i = 0; i < 3; i++) {
-            //Serial.printf("acc%d: %lf   ", i, acc_VECT[i]);
+            Serial.printf("acc%d: %lf   ", i, acc_VECT[i]);
         }
         //Serial.printf("MAGnitude: %lf      ", mag_acc);
         for (int i = 0; i < 3; i++) {
-            //Serial.printf("grav%d: %8.5lf,  ", i, grav_VECT[i]);
+            Serial.printf("grav%d: %8.5lf,  ", i, grav_VECT[i]);
         }
         //Serial.printf("MAGnitude: %lf      ", mag_grav);
-        for (int i = 0; i < 3; i++) {
-            //Serial.printf("lia%d: %lf  ", i, lia_VECT[i]);
+        for (int i = 2; i < 3; i++) {
+            Serial.printf("tav%d: %lf  ", i, trueAccVect[i]);
         }
-        //Serial.printf("MAGnitude: %lf      ", mag_lia);
-        for (int i = 0; i < 3; i++) {
-            //Serial.printf("ori%d: %lf  ", i, ori_VECT[i]);
+        for (int i = 2; i < 3; i++) {
+            Serial.printf("tavkf%d: %lf  ", i, trueAccVectKf[i]);
         }
 
-        //Serial.println("\n");
+        //Serial.printf("MAGnitude: %lf      ", mag_lia);
+        for (int i = 0; i < 3; i++) {
+            Serial.printf("ori%d: %lf  ", i, ori_VECT[i]);
+        }
+
+        Serial.println("\n");
 
 
 
