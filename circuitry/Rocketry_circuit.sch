@@ -155,6 +155,7 @@
 <layer number="255" name="routoute" color="7" fill="1" visible="yes" active="yes"/>
 </layers>
 <schematic xreflabel="%F%N/%S.%C%R" xrefpart="/%S.%C%R">
+<fusionteam huburn="a.YnVzaW5lc3M6c2hlZmZpZWxkMjc4Nw" projecturn="a.YnVzaW5lc3M6c2hlZmZpZWxkMjc4NyMyMDIyMDMwMjUwMzA2NDc3Ng" folderUrn="urn:adsk.wipprod:fs.folder:co.I3GsyREKSyqqvbJB1hIioQ" urn="urn:adsk.wipprod:dm.lineage:APn9M5JCQH-6ql8Q4Hl2Ng"  versionUrn="urn:adsk.wipprod:fs.file:vf.APn9M5JCQH-6ql8Q4Hl2Ng?version=2" camFileUrn="" camFileVersionUrn="" lastpublishedchangeguid="3e0edd60-f172-4a0e-c01f-4f6dd1e2749d"/>
 <libraries>
 <library name="supply1" urn="urn:adsk.eagle:library:371">
 <description>&lt;b&gt;Supply Symbols&lt;/b&gt;&lt;p&gt;
@@ -3100,7 +3101,7 @@ type 0309, grid 2.5 mm</description>
 </package>
 </packages>
 <packages3d>
-<package3d name="TEENSY41" urn="urn:adsk.eagle:package:34376405/4" type="box" library_version="7">
+<package3d name="TEENSY41" urn="urn:adsk.eagle:package:34376405/5" type="model" library_version="8">
 <packageinstances>
 <packageinstance name="TEENSY41"/>
 </packageinstances>
@@ -3164,7 +3165,7 @@ type 0309, grid 2.5 mm</description>
 </symbol>
 </symbols>
 <devicesets>
-<deviceset name="TEENSY41" urn="urn:adsk.eagle:component:34376408/7" library_version="7">
+<deviceset name="TEENSY41" urn="urn:adsk.eagle:component:34376408/8" library_version="8">
 <gates>
 <gate name="G$1" symbol="TEENSY41" x="0" y="-2.54"/>
 </gates>
@@ -3221,7 +3222,7 @@ type 0309, grid 2.5 mm</description>
 <connect gate="G$1" pin="VIN" pad="VIN"/>
 </connects>
 <package3dinstances>
-<package3dinstance package3d_urn="urn:adsk.eagle:package:34376405/4"/>
+<package3dinstance package3d_urn="urn:adsk.eagle:package:34376405/5"/>
 </package3dinstances>
 <technologies>
 <technology name=""/>
@@ -3453,80 +3454,6 @@ type 0309, grid 2.5 mm</description>
 </connects>
 <package3dinstances>
 <package3dinstance package3d_urn="urn:adsk.eagle:package:34376425/3"/>
-</package3dinstances>
-<technologies>
-<technology name=""/>
-</technologies>
-</device>
-</devices>
-</deviceset>
-</devicesets>
-</library>
-<library name="BMP388" urn="urn:adsk.eagle:library:34389065">
-<packages>
-<package name="BMP388" urn="urn:adsk.eagle:footprint:34389066/3" library_version="3">
-<pad name="VIN" x="2.54" y="19.685" drill="0.85" diameter="1.4224"/>
-<pad name="3V0" x="2.54" y="17.145" drill="0.85" diameter="1.4224"/>
-<pad name="GND" x="2.54" y="14.605" drill="0.85" diameter="1.4224"/>
-<pad name="SCK" x="2.54" y="12.065" drill="0.85" diameter="1.4224"/>
-<pad name="SDO" x="2.54" y="9.525" drill="0.85" diameter="1.4224"/>
-<pad name="SDI" x="2.54" y="6.985" drill="0.85" diameter="1.4224"/>
-<pad name="CS" x="2.54" y="4.445" drill="0.85" diameter="1.4224"/>
-<pad name="INT" x="2.54" y="1.905" drill="0.85" diameter="1.4224"/>
-<wire x1="0" y1="0" x2="0" y2="21.59" width="0.127" layer="21"/>
-<wire x1="0" y1="21.59" x2="16.51" y2="21.59" width="0.127" layer="21"/>
-<wire x1="16.51" y1="21.59" x2="16.51" y2="0" width="0.127" layer="21"/>
-<wire x1="16.51" y1="0" x2="0" y2="0" width="0.127" layer="21"/>
-<hole x="13.97" y="19.05" drill="3.5"/>
-<hole x="13.97" y="2.54" drill="3.5"/>
-<text x="13.335" y="13.335" size="1.27" layer="25" rot="SR270">BMP388</text>
-<text x="3.81" y="20.32" size="0.75" layer="25" rot="SR270">VIN  3Vo  GND  SCK  SDO  SDI   CS    INT</text>
-<text x="12.065" y="13.335" size="0.6096" layer="25" rot="SR270">Temp + Pressure</text>
-</package>
-</packages>
-<packages3d>
-<package3d name="BMP388" urn="urn:adsk.eagle:package:34389068/4" type="model" library_version="3">
-<packageinstances>
-<packageinstance name="BMP388"/>
-</packageinstances>
-</package3d>
-</packages3d>
-<symbols>
-<symbol name="BMP388" urn="urn:adsk.eagle:symbol:34389067/1" library_version="3">
-<pin name="VIN" x="-15.24" y="12.7" length="middle"/>
-<pin name="3V0" x="-15.24" y="7.62" length="middle"/>
-<pin name="GND" x="-15.24" y="2.54" length="middle"/>
-<pin name="SCK" x="-15.24" y="-2.54" length="middle"/>
-<pin name="SDO" x="-15.24" y="-7.62" length="middle"/>
-<pin name="SDI" x="-15.24" y="-12.7" length="middle"/>
-<pin name="CS" x="-15.24" y="-17.78" length="middle"/>
-<pin name="INT" x="-15.24" y="-22.86" length="middle"/>
-<wire x1="-10.16" y1="-25.4" x2="-10.16" y2="15.24" width="0.254" layer="94"/>
-<wire x1="-10.16" y1="15.24" x2="17.78" y2="15.24" width="0.254" layer="94"/>
-<wire x1="17.78" y1="15.24" x2="17.78" y2="-25.4" width="0.254" layer="94"/>
-<wire x1="17.78" y1="-25.4" x2="-10.16" y2="-25.4" width="0.254" layer="94"/>
-<text x="-10.16" y="15.24" size="1.778" layer="95">BMP388</text>
-</symbol>
-</symbols>
-<devicesets>
-<deviceset name="BMP388" urn="urn:adsk.eagle:component:34389069/3" library_version="3">
-<gates>
-<gate name="G$1" symbol="BMP388" x="-2.54" y="5.08"/>
-</gates>
-<devices>
-<device name="" package="BMP388">
-<connects>
-<connect gate="G$1" pin="3V0" pad="3V0"/>
-<connect gate="G$1" pin="CS" pad="CS"/>
-<connect gate="G$1" pin="GND" pad="GND"/>
-<connect gate="G$1" pin="INT" pad="INT"/>
-<connect gate="G$1" pin="SCK" pad="SCK"/>
-<connect gate="G$1" pin="SDI" pad="SDI"/>
-<connect gate="G$1" pin="SDO" pad="SDO"/>
-<connect gate="G$1" pin="VIN" pad="VIN"/>
-</connects>
-<package3dinstances>
-<package3dinstance package3d_urn="urn:adsk.eagle:package:34389068/4"/>
 </package3dinstances>
 <technologies>
 <technology name=""/>
@@ -5507,6 +5434,76 @@ Source: &lt;a href="http://uk.rs-online.com/web/p/products/7747655"&gt; Datashee
 </deviceset>
 </devicesets>
 </library>
+<library name="BMP280" urn="urn:adsk.eagle:library:34675788">
+<packages>
+<package name="BMP280" urn="urn:adsk.eagle:footprint:34675792/3" library_version="6">
+<pad name="VIN" x="2.54" y="16.51" drill="0.85" diameter="1.4224"/>
+<pad name="3VO" x="2.54" y="13.97" drill="0.85" diameter="1.4224"/>
+<pad name="GND" x="2.54" y="11.43" drill="0.85" diameter="1.4224"/>
+<pad name="SCK" x="2.54" y="8.89" drill="0.85" diameter="1.4224"/>
+<pad name="SDO" x="2.54" y="6.35" drill="0.85" diameter="1.4224"/>
+<pad name="SDI" x="2.54" y="3.81" drill="0.85" diameter="1.4224"/>
+<pad name="CS" x="2.54" y="1.27" drill="0.85" diameter="1.4224"/>
+<wire x1="0" y1="0" x2="0" y2="17.78" width="0.127" layer="21"/>
+<wire x1="0" y1="17.78" x2="19.05" y2="17.78" width="0.127" layer="21"/>
+<wire x1="19.05" y1="17.78" x2="19.05" y2="0" width="0.127" layer="21"/>
+<wire x1="19.05" y1="0" x2="0" y2="0" width="0.127" layer="21"/>
+<hole x="16.51" y="15.24" drill="3.5"/>
+<hole x="16.51" y="2.54" drill="3.5"/>
+<text x="16.51" y="12.065" size="1.016" layer="21" rot="SR270">BMP280</text>
+<text x="3.81" y="17.145" size="0.8" layer="21" rot="SR270">VIN 3V0 GND SCK SDO SDI  CS</text>
+</package>
+</packages>
+<packages3d>
+<package3d name="BMP280" urn="urn:adsk.eagle:package:34675794/4" type="model" library_version="6">
+<packageinstances>
+<packageinstance name="BMP280"/>
+</packageinstances>
+</package3d>
+</packages3d>
+<symbols>
+<symbol name="BMP280" urn="urn:adsk.eagle:symbol:34675793/2" library_version="6">
+<pin name="VIN" x="-5.08" y="35.56" length="middle"/>
+<pin name="3VO" x="-5.08" y="30.48" length="middle"/>
+<pin name="GND" x="-5.08" y="25.4" length="middle"/>
+<pin name="SCK" x="-5.08" y="20.32" length="middle"/>
+<pin name="SDO" x="-5.08" y="15.24" length="middle"/>
+<pin name="SDI" x="-5.08" y="10.16" length="middle"/>
+<pin name="CS" x="-5.08" y="5.08" length="middle"/>
+<wire x1="0" y1="40.64" x2="0" y2="0" width="0.254" layer="94"/>
+<wire x1="0" y1="0" x2="27.94" y2="0" width="0.254" layer="94"/>
+<wire x1="27.94" y1="0" x2="27.94" y2="40.64" width="0.254" layer="94"/>
+<wire x1="27.94" y1="40.64" x2="0" y2="40.64" width="0.254" layer="94"/>
+<text x="0" y="40.64" size="2.54" layer="95">BMP280</text>
+</symbol>
+</symbols>
+<devicesets>
+<deviceset name="BMP280" urn="urn:adsk.eagle:component:34682393/1" library_version="6">
+<gates>
+<gate name="G$1" symbol="BMP280" x="0" y="0"/>
+</gates>
+<devices>
+<device name="" package="BMP280">
+<connects>
+<connect gate="G$1" pin="3VO" pad="3VO"/>
+<connect gate="G$1" pin="CS" pad="CS"/>
+<connect gate="G$1" pin="GND" pad="GND"/>
+<connect gate="G$1" pin="SCK" pad="SCK"/>
+<connect gate="G$1" pin="SDI" pad="SDI"/>
+<connect gate="G$1" pin="SDO" pad="SDO"/>
+<connect gate="G$1" pin="VIN" pad="VIN"/>
+</connects>
+<package3dinstances>
+<package3dinstance package3d_urn="urn:adsk.eagle:package:34675794/4"/>
+</package3dinstances>
+<technologies>
+<technology name=""/>
+</technologies>
+</device>
+</devices>
+</deviceset>
+</devicesets>
+</library>
 </libraries>
 <attributes>
 </attributes>
@@ -5526,7 +5523,7 @@ Source: &lt;a href="http://uk.rs-online.com/web/p/products/7747655"&gt; Datashee
 <part name="GND10" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="GND" device=""/>
 <part name="R3" library="adafruit" library_urn="urn:adsk.eagle:library:420" deviceset="R-US_" device="0207/5V" package3d_urn="urn:adsk.eagle:package:6240601/1" value="2.2k"/>
 <part name="R1" library="adafruit" library_urn="urn:adsk.eagle:library:420" deviceset="R-US_" device="0207/5V" package3d_urn="urn:adsk.eagle:package:6240601/1" value="2.2k"/>
-<part name="U$1" library="teensy" library_urn="urn:adsk.eagle:library:34376398" deviceset="TEENSY41" device="" package3d_urn="urn:adsk.eagle:package:34376405/4"/>
+<part name="U$1" library="teensy" library_urn="urn:adsk.eagle:library:34376398" deviceset="TEENSY41" device="" package3d_urn="urn:adsk.eagle:package:34376405/5"/>
 <part name="U$3" library="ADXL377" library_urn="urn:adsk.eagle:library:34388822" deviceset="ADXL377" device="" package3d_urn="urn:adsk.eagle:package:34388825/6"/>
 <part name="BRKOUT1" library="BNO055" library_urn="urn:adsk.eagle:library:34376417" deviceset="BNO055" device="" package3d_urn="urn:adsk.eagle:package:34376420/11"/>
 <part name="+3V3" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="+3V3" device=""/>
@@ -5536,7 +5533,6 @@ Source: &lt;a href="http://uk.rs-online.com/web/p/products/7747655"&gt; Datashee
 <part name="U$4" library="NEO6M" library_urn="urn:adsk.eagle:library:34376422" deviceset="NEO6M" device="" package3d_urn="urn:adsk.eagle:package:34376425/3"/>
 <part name="+3V5" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="+3V3" device=""/>
 <part name="GND6" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="GND" device=""/>
-<part name="U$2" library="BMP388" library_urn="urn:adsk.eagle:library:34389065" deviceset="BMP388" device="" package3d_urn="urn:adsk.eagle:package:34389068/4"/>
 <part name="U$5" library="RMF96W_lora" library_urn="urn:adsk.eagle:library:34492806" deviceset="RFM96W" device="" package3d_urn="urn:adsk.eagle:package:34492839/4"/>
 <part name="+3V6" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="+3V3" device=""/>
 <part name="GND7" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="GND" device=""/>
@@ -5556,6 +5552,7 @@ Source: &lt;a href="http://uk.rs-online.com/web/p/products/7747655"&gt; Datashee
 <part name="C4" library="capacitor-wima" library_urn="urn:adsk.eagle:library:116" deviceset="C" device="2,5-3" package3d_urn="urn:adsk.eagle:package:5436/1" value="10u"/>
 <part name="C5" library="capacitor-wima" library_urn="urn:adsk.eagle:library:116" deviceset="C" device="2,5-3" package3d_urn="urn:adsk.eagle:package:5436/1" value="100u"/>
 <part name="D2" library="diode" library_urn="urn:adsk.eagle:library:210" deviceset="1N4004" device="" package3d_urn="urn:adsk.eagle:package:43336/1"/>
+<part name="U$2" library="BMP280" library_urn="urn:adsk.eagle:library:34675788" deviceset="BMP280" device="" package3d_urn="urn:adsk.eagle:package:34675794/4"/>
 </parts>
 <sheets>
 <sheet>
@@ -5567,7 +5564,6 @@ Source: &lt;a href="http://uk.rs-online.com/web/p/products/7747655"&gt; Datashee
 <wire x1="355.6" y1="220.98" x2="0" y2="220.98" width="0.254" layer="103"/>
 <text x="5.08" y="223.52" size="6.4516" layer="103">ONBOARD</text>
 <text x="274.32" y="213.36" size="1.778" layer="97">POWER SUPPLY</text>
-<text x="297.18" y="180.34" size="1.778" layer="97">STILL UNSURE ABOUT THIS CAPACITOR VALUE</text>
 </plain>
 <instances>
 <instance part="+3V1" gate="G$1" x="96.52" y="187.96" smashed="yes">
@@ -5611,8 +5607,8 @@ Source: &lt;a href="http://uk.rs-online.com/web/p/products/7747655"&gt; Datashee
 <instance part="+3V4" gate="G$1" x="91.44" y="45.72" smashed="yes" rot="R270">
 <attribute name="VALUE" x="86.36" y="48.26" size="1.778" layer="96"/>
 </instance>
-<instance part="GND4" gate="1" x="91.44" y="55.88" smashed="yes" rot="R90">
-<attribute name="VALUE" x="93.98" y="53.34" size="1.778" layer="96" rot="R90"/>
+<instance part="GND4" gate="1" x="96.52" y="55.88" smashed="yes" rot="R90">
+<attribute name="VALUE" x="99.06" y="53.34" size="1.778" layer="96" rot="R90"/>
 </instance>
 <instance part="U$4" gate="G$1" x="248.92" y="144.78" smashed="yes"/>
 <instance part="+3V5" gate="G$1" x="220.98" y="152.4" smashed="yes" rot="R90">
@@ -5621,7 +5617,6 @@ Source: &lt;a href="http://uk.rs-online.com/web/p/products/7747655"&gt; Datashee
 <instance part="GND6" gate="1" x="226.06" y="137.16" smashed="yes" rot="R270">
 <attribute name="VALUE" x="223.52" y="139.7" size="1.778" layer="96" rot="R270"/>
 </instance>
-<instance part="U$2" gate="G$1" x="63.5" y="58.42" smashed="yes" rot="R180"/>
 <instance part="U$5" gate="G$1" x="259.08" y="66.04" smashed="yes"/>
 <instance part="+3V6" gate="G$1" x="243.84" y="111.76" smashed="yes" rot="R90">
 <attribute name="VALUE" x="248.92" y="109.22" size="1.778" layer="96" rot="R180"/>
@@ -5685,6 +5680,7 @@ Source: &lt;a href="http://uk.rs-online.com/web/p/products/7747655"&gt; Datashee
 <attribute name="NAME" x="269.7226" y="195.58" size="1.778" layer="95" rot="R270"/>
 <attribute name="VALUE" x="266.9286" y="195.58" size="1.778" layer="96" rot="R270"/>
 </instance>
+<instance part="U$2" gate="G$1" x="78.74" y="81.28" smashed="yes" rot="R180"/>
 </instances>
 <busses>
 </busses>
@@ -5709,11 +5705,6 @@ Source: &lt;a href="http://uk.rs-online.com/web/p/products/7747655"&gt; Datashee
 <wire x1="78.74" y1="104.14" x2="88.9" y2="104.14" width="0.1524" layer="91"/>
 </segment>
 <segment>
-<pinref part="+3V4" gate="G$1" pin="+3V3"/>
-<wire x1="78.74" y1="45.72" x2="88.9" y2="45.72" width="0.1524" layer="91"/>
-<pinref part="U$2" gate="G$1" pin="VIN"/>
-</segment>
-<segment>
 <pinref part="+3V5" gate="G$1" pin="+3V3"/>
 <pinref part="U$4" gate="G$1" pin="VCC"/>
 <wire x1="223.52" y1="152.4" x2="233.68" y2="152.4" width="0.1524" layer="91"/>
@@ -5732,6 +5723,11 @@ Source: &lt;a href="http://uk.rs-online.com/web/p/products/7747655"&gt; Datashee
 <wire x1="297.18" y1="175.26" x2="297.18" y2="172.72" width="0.1524" layer="91"/>
 <wire x1="289.56" y1="180.34" x2="289.56" y2="175.26" width="0.1524" layer="91"/>
 <wire x1="289.56" y1="175.26" x2="297.18" y2="175.26" width="0.1524" layer="91"/>
+</segment>
+<segment>
+<pinref part="U$2" gate="G$1" pin="VIN"/>
+<pinref part="+3V4" gate="G$1" pin="+3V3"/>
+<wire x1="83.82" y1="45.72" x2="88.9" y2="45.72" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="GND" class="0">
@@ -5760,15 +5756,6 @@ Source: &lt;a href="http://uk.rs-online.com/web/p/products/7747655"&gt; Datashee
 <pinref part="U$3" gate="G$1" pin="GND"/>
 <pinref part="GND3" gate="1" pin="GND"/>
 <wire x1="78.74" y1="99.06" x2="88.9" y2="99.06" width="0.1524" layer="91"/>
-</segment>
-<segment>
-<pinref part="GND4" gate="1" pin="GND"/>
-<wire x1="88.9" y1="55.88" x2="83.82" y2="55.88" width="0.1524" layer="91"/>
-<wire x1="78.74" y1="66.04" x2="83.82" y2="66.04" width="0.1524" layer="91"/>
-<wire x1="83.82" y1="66.04" x2="83.82" y2="55.88" width="0.1524" layer="91"/>
-<pinref part="U$2" gate="G$1" pin="SDO"/>
-<pinref part="U$2" gate="G$1" pin="GND"/>
-<wire x1="83.82" y1="55.88" x2="78.74" y2="55.88" width="0.1524" layer="91"/>
 </segment>
 <segment>
 <pinref part="GND6" gate="1" pin="GND"/>
@@ -5811,6 +5798,15 @@ Source: &lt;a href="http://uk.rs-online.com/web/p/products/7747655"&gt; Datashee
 <wire x1="289.56" y1="190.5" x2="299.72" y2="190.5" width="0.1524" layer="91"/>
 <wire x1="289.56" y1="187.96" x2="289.56" y2="190.5" width="0.1524" layer="91"/>
 </segment>
+<segment>
+<pinref part="GND4" gate="1" pin="GND"/>
+<pinref part="U$2" gate="G$1" pin="GND"/>
+<wire x1="93.98" y1="55.88" x2="88.9" y2="55.88" width="0.1524" layer="91"/>
+<pinref part="U$2" gate="G$1" pin="SDO"/>
+<wire x1="88.9" y1="55.88" x2="83.82" y2="55.88" width="0.1524" layer="91"/>
+<wire x1="83.82" y1="66.04" x2="88.9" y2="66.04" width="0.1524" layer="91"/>
+<wire x1="88.9" y1="66.04" x2="88.9" y2="55.88" width="0.1524" layer="91"/>
+</segment>
 </net>
 <net name="+5V" class="0">
 <segment>
@@ -5841,9 +5837,12 @@ Source: &lt;a href="http://uk.rs-online.com/web/p/products/7747655"&gt; Datashee
 <wire x1="144.78" y1="157.48" x2="144.78" y2="144.78" width="0.1524" layer="91"/>
 <pinref part="U$1" gate="G$1" pin="19-A5/SCL0"/>
 <wire x1="144.78" y1="144.78" x2="154.94" y2="144.78" width="0.1524" layer="91"/>
-<wire x1="78.74" y1="60.96" x2="96.52" y2="60.96" width="0.1524" layer="91"/>
 <wire x1="96.52" y1="60.96" x2="96.52" y2="157.48" width="0.1524" layer="91"/>
+<wire x1="144.78" y1="144.78" x2="144.78" y2="132.08" width="0.1524" layer="91"/>
+<pinref part="U$1" gate="G$1" pin="24-A10/TX6/SCL2"/>
+<wire x1="144.78" y1="132.08" x2="154.94" y2="132.08" width="0.1524" layer="91"/>
 <pinref part="U$2" gate="G$1" pin="SCK"/>
+<wire x1="96.52" y1="60.96" x2="83.82" y2="60.96" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="N$5" class="0">
@@ -5856,10 +5855,14 @@ Source: &lt;a href="http://uk.rs-online.com/web/p/products/7747655"&gt; Datashee
 <pinref part="U$1" gate="G$1" pin="18-A4/SDA0"/>
 <wire x1="106.68" y1="162.56" x2="132.08" y2="162.56" width="0.1524" layer="91"/>
 <wire x1="132.08" y1="162.56" x2="132.08" y2="147.32" width="0.1524" layer="91"/>
-<wire x1="132.08" y1="147.32" x2="154.94" y2="147.32" width="0.1524" layer="91"/>
-<wire x1="78.74" y1="71.12" x2="106.68" y2="71.12" width="0.1524" layer="91"/>
+<wire x1="132.08" y1="147.32" x2="142.24" y2="147.32" width="0.1524" layer="91"/>
+<wire x1="142.24" y1="147.32" x2="154.94" y2="147.32" width="0.1524" layer="91"/>
 <wire x1="106.68" y1="71.12" x2="106.68" y2="162.56" width="0.1524" layer="91"/>
+<pinref part="U$1" gate="G$1" pin="25-A11/RX6/SDA2"/>
+<wire x1="142.24" y1="147.32" x2="142.24" y2="129.54" width="0.1524" layer="91"/>
+<wire x1="142.24" y1="129.54" x2="154.94" y2="129.54" width="0.1524" layer="91"/>
 <pinref part="U$2" gate="G$1" pin="SDI"/>
+<wire x1="83.82" y1="71.12" x2="106.68" y2="71.12" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="N$1" class="0">
@@ -5904,16 +5907,24 @@ Source: &lt;a href="http://uk.rs-online.com/web/p/products/7747655"&gt; Datashee
 <wire x1="233.68" y1="147.32" x2="218.44" y2="147.32" width="0.1524" layer="91"/>
 <wire x1="218.44" y1="147.32" x2="218.44" y2="142.24" width="0.1524" layer="91"/>
 <pinref part="U$1" gate="G$1" pin="0-RX1/CS1/CRX2"/>
-<wire x1="218.44" y1="142.24" x2="210.82" y2="142.24" width="0.1524" layer="91"/>
+<wire x1="218.44" y1="142.24" x2="213.36" y2="142.24" width="0.1524" layer="91"/>
+<wire x1="213.36" y1="142.24" x2="210.82" y2="142.24" width="0.1524" layer="91"/>
+<wire x1="213.36" y1="142.24" x2="213.36" y2="134.62" width="0.1524" layer="91"/>
+<pinref part="U$1" gate="G$1" pin="7-RX2/OUT1A"/>
+<wire x1="213.36" y1="134.62" x2="210.82" y2="134.62" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="N$7" class="0">
 <segment>
 <pinref part="U$1" gate="G$1" pin="1-TX1/MISO1/CTX2"/>
-<wire x1="210.82" y1="139.7" x2="223.52" y2="139.7" width="0.1524" layer="91"/>
+<wire x1="210.82" y1="139.7" x2="215.9" y2="139.7" width="0.1524" layer="91"/>
+<wire x1="215.9" y1="139.7" x2="223.52" y2="139.7" width="0.1524" layer="91"/>
 <wire x1="223.52" y1="139.7" x2="223.52" y2="142.24" width="0.1524" layer="91"/>
 <pinref part="U$4" gate="G$1" pin="TX"/>
 <wire x1="223.52" y1="142.24" x2="233.68" y2="142.24" width="0.1524" layer="91"/>
+<wire x1="215.9" y1="139.7" x2="215.9" y2="132.08" width="0.1524" layer="91"/>
+<pinref part="U$1" gate="G$1" pin="8-TX2/IN1"/>
+<wire x1="215.9" y1="132.08" x2="210.82" y2="132.08" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="N$8" class="0">
