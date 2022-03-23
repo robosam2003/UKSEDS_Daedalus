@@ -109,7 +109,6 @@ unsigned short READREG(byte reg, int numbytes) {
         if (numbytes == 1){
 
             data = Wire.read();
-
         }
         else {
             datalow = Wire.read();
@@ -117,8 +116,6 @@ unsigned short READREG(byte reg, int numbytes) {
 
 
             data = (datahigh << 8) | datalow;
-
-
         }
     }
     else{
@@ -201,7 +198,7 @@ void calcRotationVect(double acc_meas[3], double ori[3], double returnVect[3]){ 
     }
     for (int i=0; i<3; i++) {
         for (int j=0; j<3; j++) {
-            returnVect[i] += rotMatZ[i][j]*vec2[j];
+            returnVect[i] += rotMatZ[i][j]*vec2[j]; // TODO: Can i make this absolute value equal to 9.8 when on the ground? fixes needed
         }
     }
 
@@ -233,7 +230,7 @@ void remove_offsets() {
     bool offsets_calibrated = false;
     int counter = 0;
 
-    const int num = 100;
+    const int num = 256;
     double acc_biases_x[num] = {0};
     double acc_biases_y[num] = {0};
     double acc_biases_z[num] = {0};
@@ -249,7 +246,7 @@ void remove_offsets() {
 
     REGSET(OPR_MODE, 0b00001100); // NDOF for reading
 
-    double avg_x=0, avg_y=0, avg_z=-0;
+    double avg_x=-29, avg_y=8, avg_z=-30;
 
 
     while (!offsets_calibrated) {
@@ -300,6 +297,7 @@ void remove_offsets() {
         delay(10);
 
     }
+
 
 
     //byte acc_offset_addresses[6] = {ACC_OFFSET_X_LSB, ACC_OFFSET_X_MSB, ACC_OFFSET_Y_LSB, ACC_OFFSET_Y_MSB, ACC_OFFSET_Z_LSB, ACC_OFFSET_Z_MSB};
@@ -370,15 +368,15 @@ void remove_offsets() {
 
 void setup(void) {
     delay(2000);
-    Serial.begin(9600);
+    Serial.begin(115200);
     Wire.begin();
+    Wire.setClock(1000000);  // i2c seems to work great at 1Mhz, but may need to run on 400kHz or even 100Khz if we have issues.
     pinMode(LED_BUILTIN, OUTPUT);
     init();
-    calibrate();
+    //calibrate();
     remove_offsets();
 
     delay(1000);
-
 
 }
 
@@ -427,6 +425,10 @@ void loop() {
                            static_cast<double>(read2[4])/100,
                            static_cast<double>(read2[5])/100};
 
+    //unsigned long aft = t1;
+    //Serial.println(aft-a);
+
+
 
 
     double mag_acc = sqrt(pow(acc_VECT[0], 2) + pow(acc_VECT[1], 2) + pow(acc_VECT[2], 2));
@@ -443,10 +445,9 @@ void loop() {
     calcRotationVect(acc_VECT, ori_VECT, trueAccVect);
 
     for (int i=0; i<3; i++) { trueAccVectKf[i] =  AccKF[i].updateEstimate(static_cast<float>(trueAccVect[i])); }
+    trueAccVectKf[2] -= static_cast<float>(mag_grav);
     //dead reckoning attempt
     unsigned long b = t1;
-
-
 
 
 
@@ -456,7 +457,7 @@ void loop() {
         }
         //Serial.printf("MAGnitude: %lf      ", mag_acc);
         for (int i = 0; i < 3; i++) {
-            Serial.printf("grav%d: %8.5lf,  ", i, grav_VECT[i]);
+            //Serial.printf("grav%d: %8.5lf,  ", i, grav_VECT[i]);
         }
         //Serial.printf("MAGnitude: %lf      ", mag_grav);
         for (int i = 2; i < 3; i++) {
