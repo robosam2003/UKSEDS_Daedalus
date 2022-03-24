@@ -86,7 +86,6 @@ enum data{ // Read two bytes when neccessary
 
 
 void REGSET(byte reg, byte data) {
-
     Wire.beginTransmission(ADR_SENS);
     Wire.write(reg);
     Wire.write(data);
@@ -201,8 +200,6 @@ void calcRotationVect(double acc_meas[3], double ori[3], double returnVect[3]){ 
             returnVect[i] += rotMatZ[i][j]*vec2[j]; // TODO: Can i make this absolute value equal to 9.8 when on the ground? fixes needed
         }
     }
-
-
 }
 
 
