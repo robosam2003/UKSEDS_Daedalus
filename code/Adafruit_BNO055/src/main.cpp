@@ -12,28 +12,6 @@ elapsedMillis tmillis;
 
 
 enum data{ // Read two bytes when neccessary
-    ACC_OFFSET_X_LSB = 0x55,
-    ACC_OFFSET_X_MSB = 0x56,
-    ACC_OFFSET_Y_LSB = 0x57,
-    ACC_OFFSET_Y_MSB = 0x58,
-    ACC_OFFSET_Z_LSB = 0x59,
-    ACC_OFFSET_Z_MSB = 0x5A,
-
-    MAG_OFFSET_X_LSB = 0x5B,
-    MAG_OFFSET_X_MSB = 0x5C,
-    MAG_OFFSET_Y_LSB = 0x5D,
-    MAG_OFFSET_Y_MSB = 0x5E,
-    MAG_OFFSET_Z_LSB = 0x5F,
-    MAG_OFFSET_Z_MSB = 0x60,
-
-    GYR_OFFSET_X_LSB = 0x61,
-    GYR_OFFSET_X_MSB = 0x62,
-    GYR_OFFSET_Y_LSB = 0x63,
-    GYR_OFFSET_Y_MSB = 0x64,
-    GYR_OFFSET_Z_LSB = 0x65,
-    GYR_OFFSET_Z_MSB = 0x66,
-
-
     ACC_DATA_X = 0x08,
     ACC_DATA_Y = 0x0A,
     ACC_DATA_Z = 0x0C,
@@ -74,6 +52,55 @@ enum data{ // Read two bytes when neccessary
 
     AXIS_MAP_CONFIG = 0x41,
     AXIS_MAP_SIGN = 0x42,
+
+
+    SIC_MATRIX_LSB0 = 0x43,
+    SIC_MATRIX_MSB0 = 0x44,
+    SIC_MATRIX_LSB1 = 0x45,
+    SIC_MATRIX_MSB1 = 0x46,
+    SIC_MATRIX_LSB2 = 0x47,
+    SIC_MATRIX_MSB2 = 0x48,
+    SIC_MATRIX_LSB3 = 0x49,
+    SIC_MATRIX_MSB3 = 0x4A,
+    SIC_MATRIX_LSB4 = 0x4B,
+    SIC_MATRIX_MSB4 = 0x4C,
+    SIC_MATRIX_LSB5 = 0x4D,
+    SIC_MATRIX_MSB5 = 0x4E,
+    SIC_MATRIX_LSB6 = 0x4F,
+    SIC_MATRIX_MSB6 = 0x50,
+    SIC_MATRIX_LSB7 = 0x51,
+    SIC_MATRIX_MSB7 = 0x52,
+    SIC_MATRIX_LSB8 = 0x53,
+    SIC_MATRIX_MSB8 = 0x54,
+
+
+
+    ACC_OFFSET_X_LSB = 0x55,
+    ACC_OFFSET_X_MSB = 0x56,
+    ACC_OFFSET_Y_LSB = 0x57,
+    ACC_OFFSET_Y_MSB = 0x58,
+    ACC_OFFSET_Z_LSB = 0x59,
+    ACC_OFFSET_Z_MSB = 0x5A,
+
+    MAG_OFFSET_X_LSB = 0x5B,
+    MAG_OFFSET_X_MSB = 0x5C,
+    MAG_OFFSET_Y_LSB = 0x5D,
+    MAG_OFFSET_Y_MSB = 0x5E,
+    MAG_OFFSET_Z_LSB = 0x5F,
+    MAG_OFFSET_Z_MSB = 0x60,
+
+    GYR_OFFSET_X_LSB = 0x61,
+    GYR_OFFSET_X_MSB = 0x62,
+    GYR_OFFSET_Y_LSB = 0x63,
+    GYR_OFFSET_Y_MSB = 0x64,
+    GYR_OFFSET_Z_LSB = 0x65,
+    GYR_OFFSET_Z_MSB = 0x66,
+
+    // NEW
+    ACC_RADIUS_LSB = 0x67,
+    ACC_RADIUS_MSB = 0x68,
+    MAG_RADIUS_LSB = 0x69,
+    MAG_RADIUS_MSB = 0x6A,
 
     PAGE_ID = 0x07,
 
