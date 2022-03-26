@@ -12,6 +12,60 @@ elapsedMicros microTimer;
 BNO055 sensor(BNO055_I2C_ADDRESS, &Wire);
 
 
+void remove_offsets(){
+    short accOffsetX = -29,
+            accOffsetY = 8,
+            accOffsetZ = -30;
+    signed short addresses[3][9] = {{ACC_OFFSET_X_LSB, ACC_OFFSET_X_MSB,
+                                            ACC_OFFSET_Y_LSB, ACC_OFFSET_Y_MSB,
+                                            ACC_OFFSET_Z_LSB, ACC_OFFSET_Z_MSB,
+                                            accOffsetX, accOffsetY, accOffsetZ},
+                                    {MAG_OFFSET_X_LSB, MAG_OFFSET_X_MSB,
+                                            MAG_OFFSET_Y_LSB, MAG_OFFSET_Y_MSB,
+                                            MAG_OFFSET_Z_LSB, MAG_OFFSET_Z_MSB,
+                                            0, 0, 0},
+                                    {GYR_OFFSET_X_LSB, GYR_OFFSET_X_MSB,
+                                            GYR_OFFSET_Y_LSB, GYR_OFFSET_Y_MSB,
+                                            GYR_OFFSET_Z_LSB, GYR_OFFSET_Z_MSB,
+                                            0, 0 ,0}};
+    for (int i = 0; i<3; i++) {
+        short x = addresses[i][6];
+        short y = addresses[i][7];
+        short z = addresses[i][8];
+
+        byte datalow_x = x & 0xFF;
+        byte datahigh_x = (x >> 8) & 0xFF;
+        byte datalow_y = y & 0xFF;
+        byte datahigh_y = (y >> 8) & 0xFF;
+        byte datalow_z = z & 0xFF;
+        byte datahigh_z = (z >> 8) & 0xFF;
+
+        sensor.setOperationMode(CONFIGMODE);
+
+
+        sensor.writeRegister(addresses[i][0], datalow_x);
+
+
+        sensor.writeRegister(addresses[i][1], datahigh_x);
+        delay(10);
+        sensor.writeRegister(addresses[i][2], datalow_y);
+        sensor.writeRegister(addresses[i][3], datahigh_y);
+        delay(10);
+        sensor.writeRegister(addresses[i][4], datalow_z);
+        sensor.writeRegister(addresses[i][5], datahigh_z);
+
+        sensor.setOperationMode(NDOF);
+
+        //Serial.printf("%d,  %d,  %d  \n", acc_biases_x[0], acc_biases_x[1], acc_biases_x[2]);
+        //Serial.printf("%d,  %d,  %d  \n", acc_biases_y[0], acc_biases_y[1], acc_biases_y[2]);
+        //Serial.printf("%d,  %d,  %d  \n", acc_biases_z[0], acc_biases_z[1], acc_biases_z[2]);
+        Serial.printf("x: %d, y: %d, z: %d  \n", x, y, z);
+
+        Serial.println("ALL OFFSETS CALIBRATED");
+        delay(1000);
+    }
+}
+
 void init() {
     delay(2000);
     sensor.setPowerMode(NORMAL);
@@ -22,6 +76,8 @@ void init() {
 
     sensor.writeRegister(BNO055_AXIS_MAP_CONFIG, 0b00100100); // TODO: Check that this will be correct for our pcb
     sensor.writeRegister(BNO055_AXIS_MAP_SIGN, 0b00000000);
+
+    remove_offsets();
 
     sensor.setOperationMode(NDOF);
 
@@ -49,10 +105,11 @@ void loop() {
 
 
 
-    //Serial.printf("%lf, lf, lf%c\n", acc.getX(), acc.getY(), acc.getZ());
+    Serial.printf("%lf, %lf, %lf\n", acc.getX(), acc.getY(), acc.getZ());
 
     //Serial.print((String)data.mag.getX() + ", " + (String)data.mag.getY() + ", " + (String)data.mag.getZ() + ",   ");
     //Serial.println((String)data.gyro.getX() + ", " + (String)data.gyro.getY() + ", " + (String)data.gyro.getZ() + ",   ");
     unsigned long b = microTimer;
     Serial.println(b-a);
+    delayMicroseconds(10000-(b-a));
 }
