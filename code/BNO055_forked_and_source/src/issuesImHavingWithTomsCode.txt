@@ -1,0 +1,5 @@
+- The getAllData() function gives weird data, every other line is mostly zeros, except for accel.getX() ???????
+    - The getAllData() function also take FAR too long - ~ 15.5ms (at 1MHz i2c speed) for a burst read.
+    - I am using the getRawAcceleration()... etc for now - ~ takes 1.15ms (at 1MHz i2c speed) to read all the data WITH SEPERATE READS
+      (which should be slower?????). Some optimisation needed // TODO: Optimise i2c reading of all data.
+

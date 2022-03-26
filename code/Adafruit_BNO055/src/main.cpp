@@ -109,6 +109,7 @@ enum data{ // Read two bytes when neccessary
     ACC_CONFIG = 0x08,
 
 
+
 };
 
 
@@ -243,7 +244,7 @@ void init() {
 
     REGSET(PWR_MODE, 0b00000000); // normal mode
 
-    REGSET(UNIT_SEL, 0b00000110); //Celcius, degrees, dps, m/s^2
+    REGSET(UNIT_SEL, 0b00000110); //Celsius, degrees, dps, m/s^2
 
     REGSET(AXIS_MAP_CONFIG, 0b00100100);
     REGSET(AXIS_MAP_SIGN, 0b00000000);
