@@ -11,6 +11,42 @@ elapsedMillis milliTimer;
 elapsedMicros microTimer;
 BNO055 sensor(BNO055_I2C_ADDRESS, &Wire);
 
+SimpleKalmanFilter filteredAccX = SimpleKalmanFilter(0.05, 0.05, 0.01);
+SimpleKalmanFilter filteredAccY = SimpleKalmanFilter(0.05, 0.05, 0.01);
+SimpleKalmanFilter filteredAccZ = SimpleKalmanFilter(0.05, 0.05, 0.01);
+
+SimpleKalmanFilter filteredGyroX = SimpleKalmanFilter(0.05, 0.05, 0.01);
+SimpleKalmanFilter filteredGyroY = SimpleKalmanFilter(0.05, 0.05, 0.01);
+SimpleKalmanFilter filteredGyroZ = SimpleKalmanFilter(0.05, 0.05, 0.01);
+
+Vector<double> filteredAcc;
+Vector<double> filteredGyro;
+
+
+void updateFilters(Vector<double> gyro, Vector<double> acc){
+
+    filteredAcc[0] = filteredAccX.updateEstimate(acc[0]);
+    filteredAcc[1] = filteredAccY.updateEstimate(acc[1]);
+    filteredAcc[2] = filteredAccZ.updateEstimate(acc[2]);
+
+    filteredGyro[0] = filteredGyroX.updateEstimate(gyro[0]);
+    filteredGyro[1] = filteredGyroY.updateEstimate(gyro[1]);
+    filteredGyro[2] = filteredGyroZ.updateEstimate(gyro[2]);
+
+}
+
+bno055_calib_stat_t calibrate(){
+    sensor.setOperationMode(NDOF);
+    bno055_calib_stat_t calstat = sensor.getCalibrationStatus();                       /// This delay can be changed -_
+    while ( ((calstat.accel < 3) || (calstat.gyro < 3) || (calstat.mag < 3) || (calstat.sys < 2) ) && (milliTimer < 10000) ) {
+        calstat = sensor.getCalibrationStatus();
+        (Serial) ? Serial.printf("ACC: %d,   GYR: %d,   MAG: %d,   SYS: %d\n", calstat.accel, calstat.gyro, calstat.mag, calstat.sys) : 0;
+        delay(1); // This small delay is needed so that the sensor has a chance to write to the register.
+    }
+    delay(3000);
+    return calstat;
+
+}
 
 void remove_offsets(){
     short accOffsetX = -29,
@@ -66,6 +102,7 @@ void remove_offsets(){
     }
 }
 
+
 void init() {
     delay(2000);
     sensor.setPowerMode(NORMAL);
@@ -77,14 +114,18 @@ void init() {
     sensor.writeRegister(BNO055_AXIS_MAP_CONFIG, 0b00100100); // TODO: Check that this will be correct for our pcb
     sensor.writeRegister(BNO055_AXIS_MAP_SIGN, 0b00000000);
 
-    remove_offsets();
 
+    //remove_offsets();
     sensor.setOperationMode(NDOF);
+    //calibrate();
+
+
 
 
 }
 
 void setup() {
+    pinMode(LED_BUILTIN, OUTPUT);
     Wire.begin();
     Wire.setClock(1000000);  // i2c seems to work great at 1Mhz, but may need to run on 400kHz or even 100Khz if we have issues.
     sensor.begin();
@@ -96,6 +137,8 @@ void setup() {
 
 void loop() {
     unsigned long a = microTimer;
+
+    /// Data Aquisition
     Vector<double> acc = sensor.getRawAcceleration();
     Vector<double> mag = sensor.getRawMagnetometer();
     Vector<double> gyro = sensor.getRawGyro();
@@ -104,12 +147,14 @@ void loop() {
     Vector<double> eul = sensor.getEuler();
 
 
+       /// Kalman filtering
 
-    Serial.printf("%lf, %lf, %lf\n", acc.getX(), acc.getY(), acc.getZ());
+    //(gyro, acc);
+    Serial.printf("%lf, %lf, %lf\n", acc[0], acc[1], acc[2]);
 
     //Serial.print((String)data.mag.getX() + ", " + (String)data.mag.getY() + ", " + (String)data.mag.getZ() + ",   ");
     //Serial.println((String)data.gyro.getX() + ", " + (String)data.gyro.getY() + ", " + (String)data.gyro.getZ() + ",   ");
     unsigned long b = microTimer;
-    Serial.println(b-a);
-    delayMicroseconds(10000-(b-a));
+    //Serial.println(b-a);
+    delayMicroseconds(10000);
 }
