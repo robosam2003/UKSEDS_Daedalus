@@ -1,5 +1,11 @@
+
+// include the library
 #include <Arduino.h>
 #include <RadioLib.h>
+
+
+elapsedMicros microTimer;
+
 
 // SX1278 has the following connections:
 // NSS pin:   10
@@ -8,19 +14,17 @@
 // DIO1 pin:  3
 RFM96 radio = new Module(10, 2, 9, 3);
 
-// or using RadioShield
-// https://github.com/jgromes/RadioShield
-//SX1278 fsk = RadioShield.ModuleA;
+void setFlag();
+
+// save transmission state between loops
+int transmissionState = RADIOLIB_ERR_NONE;
 
 void setup() {
     Serial.begin(9600);
 
-    // initialize RFM96W FSK modem with default settings
-    Serial.print(F("[RFM96W] Initializing ... "));
+    // initialize SX1278 with default settings
+    Serial.print(F("[SX1278] Initializing ... "));
     int state = radio.beginFSK(434.0, 100, 10.0, 250, 10, 8, false);
-
-
-
     if (state == RADIOLIB_ERR_NONE) {
         Serial.println(F("success!"));
     } else {
@@ -28,74 +32,111 @@ void setup() {
         Serial.println(state);
         while (true);
     }
-    radio.packetMode();
 
-    // if needed, you can switch between LoRa and FSK modes
-    //
-    // radio.begin()       start LoRa mode (and disable FSK)
-    // radio.beginFSK()    start FSK mode (and disable LoRa)
+    // set the function that will be called
+    // when packet transmission is finished
+    radio.setDio0Action(setFlag);
 
-    // the following settings can also
-    // be modified at run-time
-    state = radio.setFrequency(433.5);
-    state = radio.setBitRate(100.0);
-    state = radio.setFrequencyDeviation(10.0);
-    state = radio.setRxBandwidth(250.0);
-    state = radio.setOutputPower(10.0);
-    state = radio.setCurrentLimit(100);
-    state = radio.setDataShaping(RADIOLIB_SHAPING_0_5);
+    // start transmitting the first packet
+    Serial.print(F("[RFM96W] Sending first packet ... "));
 
-    uint8_t syncWord[] = {0x01, 0x23, 0x45, 0x67,
-                          0x89, 0xAB, 0xCD, 0xEF};
-    state = radio.setSyncWord(syncWord, 8);
-    if (state != RADIOLIB_ERR_NONE) {
-        Serial.print(F("Unable to set configuration, code "));
-        Serial.println(state);
-        while (true);
-    }
+    // you can transmit C-string or Arduino string up to
+    // 256 characters long
+    transmissionState = radio.startTransmit("Hello World!");
 
-    // FSK modulation can be changed to OOK
-    // NOTE: When using OOK, the maximum bit rate is only 32.768 kbps!
-    //       Also, data shaping changes from Gaussian filter to
-    //       simple filter with cutoff frequency. Make sure to call
-    //       setDataShapingOOK() to set the correct shaping!
-    /*
-    state = radio.setOOK(true);
-    state = radio.setDataShapingOOK(1);
-    if (state != RADIOLIB_ERR_NONE) {
-        Serial.print(F("Unable to change modulation, code "));
-        Serial.println(state);
-        while (true);
-    }
-
-#warning "This sketch is just an API guide! Read the note at line 6."
-     */
-}
-
-void loop() {
-    // FSK modem can use the same transmit/receive methods
-    // as the LoRa modem, even their interrupt-driven versions
-    // NOTE: FSK modem maximum packet length is 63 bytes!
-
-    // transmit FSK packet
-    int state = radio.startTransmit("Hello World! This is Sam!");
+    // you can also transmit byte array up to 256 bytes long
     /*
       byte byteArr[] = {0x01, 0x23, 0x45, 0x67,
                         0x89, 0xAB, 0xCD, 0xEF};
-      int state = radio.transmit(byteArr, 8);
+      state = radio.startTransmit(byteArr, 8);
     */
-    if (state == RADIOLIB_ERR_NONE) {
-        Serial.println(F("[RFM96W] Packet transmitted successfully!"));
-    } else if (state == RADIOLIB_ERR_PACKET_TOO_LONG) {
-        Serial.println(F("[RFM96W] Packet too long!"));
-    } else if (state == RADIOLIB_ERR_TX_TIMEOUT) {
-        Serial.println(F("[RFM96W] Timed out while transmitting!"));
-    } else {
-        Serial.println(F("[RFM96W] Failed to transmit packet, code "));
-        Serial.println(state);
+}
+
+// flag to indicate that a packet was sent
+volatile bool transmittedFlag = false;
+
+// disable interrupt when it's not needed
+volatile bool enableInterrupt = true;
+
+// this function is called when a complete packet
+// is transmitted by the module
+// IMPORTANT: this function MUST be 'void' type
+//            and MUST NOT have any arguments!
+
+void setFlag() {
+    // check if the interrupt is enabled
+    if(!enableInterrupt) {
+        return;
     }
 
-    delay(1000);
+    // we sent a packet, set the flag
+    transmittedFlag = true;
+}
 
 
+int counter = 0;
+void loop() {
+    // check if the previous transmission finished
+    if(transmittedFlag) {
+        // disable the interrupt service routine while
+        // processing the data
+        enableInterrupt = false;
+
+        // reset flag
+        transmittedFlag = false;
+
+        if (transmissionState == RADIOLIB_ERR_NONE) {
+            // packet was successfully sent
+            Serial.println(F("transmission finished!"));
+
+            // NOTE: when using interrupt-driven transmit method,
+            //       it is not possible to automatically measure
+            //       transmission data rate using getDataRate()
+
+        } else {
+            Serial.print(F("failed, code "));
+            Serial.println(transmissionState);
+
+        }
+
+        // NOTE: in FSK mode, SX127x will not automatically
+        //       turn transmitter off after sending a packet
+        //       set mode to standby to ensure we don't jam others
+        //radio.standby()
+
+        // wait a second before transmitting again
+        delay(2);
+
+        // send another one
+        Serial.print(F("[RFM96W] Sending another packet ... "));
+
+        // you can transmit C-string or Arduino string up to
+        // 256 characters long
+        //transmissionState = radio.startTransmit("Hello World! THIS IS SAM");
+
+        // you can also transmit byte array up to 256 bytes long
+
+        byte byteArr[63] = {};
+        for (int i=0; i<63; i++) { byteArr[i] = counter; }
+
+        unsigned long a = microTimer;
+        int state = radio.startTransmit(byteArr, 63); //
+        unsigned long b = microTimer;
+        Serial.printf("Transmission took (us):  %d\t", b-a);
+
+        if (state == RADIOLIB_ERR_NONE) {
+            Serial.println(F("[RFM96W] Packet transmitted successfully!"));
+        } else if (state == RADIOLIB_ERR_PACKET_TOO_LONG) {
+            Serial.println(F("[RFM96W] Packet too long!"));
+        } else if (state == RADIOLIB_ERR_TX_TIMEOUT) {
+            Serial.println(F("[RFM96W] Timed out while transmitting!"));
+        } else {
+            Serial.println(F("[RFM96W] Failed to transmit packet, code "));
+            Serial.println(state);
+        }
+        // we're ready to send more packets,
+        // enable interrupt service routine
+        enableInterrupt = true;
+        counter++;
+    }
 }
