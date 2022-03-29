@@ -1,5 +1,8 @@
-# UK_SEDS_TEAM_Y 
-To integrate a new peice of code into the code folder, clone the file using your ide, then open a new platformio project within the code folder
+# UKSEDS Team Dadalus
+
+The code and other files for the team Daedalus rocket.
+
+
 
 
 Things to check out:
