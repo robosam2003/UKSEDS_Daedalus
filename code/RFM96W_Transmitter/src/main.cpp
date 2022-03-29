@@ -1,24 +1,11 @@
-/*
-   RadioLib SX127x Transmit Example
-
-   This example transmits packets using SX1278 LoRa radio module.
-   Each packet contains up to 256 bytes of data, in the form of:
-    - Arduino String
-    - null-terminated char array (C-string)
-    - arbitrary binary data (byte array)
-
-   Other modules from SX127x/RFM9x family can also be used.
-
-   For default module settings, see the wiki page
-   https://github.com/jgromes/RadioLib/wiki/Default-configuration#sx127xrfm9x---lora-modem
-
-   For full API reference, see the GitHub Pages
-   https://jgromes.github.io/RadioLib/
-*/
 
 // include the library
 #include <Arduino.h>
 #include <RadioLib.h>
+
+
+elapsedMicros microTimer;
+
 
 // SX1278 has the following connections:
 // NSS pin:   10
@@ -26,18 +13,18 @@
 // RESET pin: 9
 // DIO1 pin:  3
 RFM96 radio = new Module(10, 2, 9, 3);
-byte counter = 20;
 
-// or using RadioShield
-// https://github.com/jgromes/RadioShield
-//SX1278 radio = RadioShield.ModuleA;
+void setFlag();
+
+// save transmission state between loops
+int transmissionState = RADIOLIB_ERR_NONE;
 
 void setup() {
     Serial.begin(9600);
 
     // initialize SX1278 with default settings
     Serial.print(F("[SX1278] Initializing ... "));
-    int state = radio.begin();
+    int state = radio.begin(434.0, 500, 9, 7, RADIOLIB_SX127X_SYNC_WORD_LORAWAN, 17, 8, 0);
     if (state == RADIOLIB_ERR_NONE) {
         Serial.println(F("success!"));
     } else {
@@ -46,151 +33,99 @@ void setup() {
         while (true);
     }
 
-    // some modules have an external RF switch
-    // controlled via two pins (RX enable, TX enable)
-    // to enable automatic control of the switch,
-    // call the following method
-    // RX enable:   4
-    // TX enable:   5
-    /*
-      radio.setRfSwitchPins(4, 5);
-    */
-}
+    // set the function that will be called
+    // when packet transmission is finished
+    radio.setDio0Action(setFlag);
 
-void loop() {
-    Serial.print(F("[SX1278] Transmitting packet ... "));
+    // start transmitting the first packet
+    //Serial.print(F("[SX1278] Sending first packet ... "));
 
     // you can transmit C-string or Arduino string up to
     // 256 characters long
-    // NOTE: transmit() is a blocking method!
-    //       See example SX127x_Transmit_Interrupt for details
-    //       on non-blocking transmission method.
-    int state = radio.transmit("Hello World!");
+    //transmissionState = radio.startTransmit("Hello World!");
 
     // you can also transmit byte array up to 256 bytes long
-   //byte byteArr[] = {};
-    //for (int i=0; i<4;i++) {byteArr[i] = counter<<(8*(3-i));}
-    //int state = radio.transmit(byteArr, 4);
+    /*
+      byte byteArr[] = {0x01, 0x23, 0x45, 0x67,
+                        0x89, 0xAB, 0xCD, 0xEF};
+      state = radio.startTransmit(byteArr, 8);
+    */
+}
 
+// flag to indicate that a packet was sent
+volatile bool transmittedFlag = false;
 
-    if (state == RADIOLIB_ERR_NONE) {
-        // the packet was successfully transmitted
-        Serial.println(F(" success!"));
+// disable interrupt when it's not needed
+volatile bool enableInterrupt = true;
 
-        // print measured data rate
-        Serial.print(F("[SX1278] Datarate:\t"));
-        Serial.print(radio.getDataRate());
-        Serial.println(F(" bps"));
-
-    } else if (state == RADIOLIB_ERR_PACKET_TOO_LONG) {
-        // the supplied packet was longer than 256 bytes
-        Serial.println(F("too long!"));
-
-    } else if (state == RADIOLIB_ERR_TX_TIMEOUT) {
-        // timeout occurred while transmitting packet
-        Serial.println(F("timeout!"));
-
-    } else {
-        // some other error occurred
-        Serial.print(F("failed, code "));
-        Serial.println(state);
-
+// this function is called when a complete packet
+// is transmitted by the module
+// IMPORTANT: this function MUST be 'void' type
+//            and MUST NOT have any arguments!
+#if defined(ESP8266) || defined(ESP32)
+ICACHE_RAM_ATTR
+#endif
+void setFlag() {
+    // check if the interrupt is enabled
+    if(!enableInterrupt) {
+        return;
     }
 
-    // wait for a second before transmitting again
-    delay(1000);
-    counter++;
+    // we sent a packet, set the flag
+    transmittedFlag = true;
 }
-
-
-
-
-/*#include <Arduino.h>
-#include <SPI.h>
-
-
-#define CS 10
-#define MOSI 11
-#define MISO 12
-#define SCK 13 // LED is also on this pin
-#define WRITE 0b10000000
-#define READ 0b00000000
-
-enum RMF96WRegsLoRa {
-    RegFifo = 0x00,
-    RegOpMode = 0x01,
-
-    // A few FSK/OOk registers in here -
-
-    // Common registers:
-    RegFrfMsb = 0x06,
-    RegFrfMid = 0x07,
-    RegFrfLsb = 0x08,
-    RegPaConfig = 0x09,
-    RegPaRamp = 0x0A,
-    RegOcp = 0x0B,
-    RegLna = 0x0C,
-
-    // LoRa mode specific names, has other names (and purposes) in FSK/OOK mode:
-    RegFifoAddrPtr = 0x0D,
-    RegFifoTxBaseAddr = 0x0E,
-    RegFifoRxBaseAddr = 0x0F,
-    FifoRxCurrentAddr = 0x10,
-    RegIrqFlagsMask = 0x11,
-    RegIrqFlags = 0x12,
-    RegRxNbBytes = 0x13,
-    RegRxHeaderCntValueMsb = 0x14,
-    RegRxHeaderCntValueLsb = 0x15,
-    RegRxPacketCntValueMsb = 0x16,
-    RegRxPacketCntValueLsb = 0x17
-
-
-
-
-};
-
-void setup() {
-    pinMode(CS, OUTPUT); // CS is pulled low when selected
-    pinMode(MOSI, OUTPUT);
-    pinMode(MISO, INPUT);
-    pinMode(SCK, OUTPUT);
-
-    SPI.beginTransaction(SPISettings(14000000, MSBFIRST, SPI_MODE0));
-
-}
-
-
-
-void RFM96WInit() {
-
-}
-
-int SPIREADREG(byte address, int bytesToRead){  // FIFO
-    address = READ | address; // puts 0 int the 8th bit.
-    byte inByte = 0;
-    int result = 0;
-    digitalWrite(CS, LOW); // begin transfer
-    for (int i=0; i<bytesToRead; i++) {
-        result = result << 8;
-        inByte = SPI.transfer(0x00);  // transfers 0x00 over MOSI line, recieves a byte over MISO line.
-        result = result | inByte;
-    }
-    digitalWrite(CS, HIGH); // end transfer
-    return result;
-}
-
-
-void SPIREGSET(byte address, byte value) {
-    address = WRITE | address; //
-    digitalWrite(CS, LOW); // pulls CS low, which begins the transfer
-    SPI.transfer(address);
-    SPI.transfer(value);
-    digitalWrite(CS, HIGH); // pulls CS high, which ends the transfer
-
-}
-
 
 void loop() {
+    // check if the previous transmission finished
+    if(transmittedFlag) {
+        // disable the interrupt service routine while
+        // processing the data
+        enableInterrupt = false;
 
+        // reset flag
+        transmittedFlag = false;
+
+        if (transmissionState == RADIOLIB_ERR_NONE) {
+            // packet was successfully sent
+            Serial.println(F("transmission finished!"));
+
+            // NOTE: when using interrupt-driven transmit method,
+            //       it is not possible to automatically measure
+            //       transmission data rate using getDataRate()
+
+        } else {
+            Serial.print(F("failed, code "));
+            Serial.println(transmissionState);
+
+        }
+
+        // NOTE: in FSK mode, SX127x will not automatically
+        //       turn transmitter off after sending a packet
+        //       set mode to standby to ensure we don't jam others
+        //radio.standby()
+
+        // wait a second before transmitting again
+        delay(100);
+
+        // send another one
+        Serial.print(F("[RFM96W] Sending another packet ... "));
+
+        // you can transmit C-string or Arduino string up to
+        // 256 characters long
+        //transmissionState = radio.startTransmit("Hello World! THIS IS SAM");
+
+        // you can also transmit byte array up to 256 bytes long
+
+        byte byteArr[255] = {};
+        for (int i=0; i<255; i++) { byteArr[i] = i; }
+
+        unsigned long a = microTimer;
+        int state = radio.startTransmit(byteArr, 255); //
+        unsigned long b = microTimer;
+        Serial.printf("Transmission took (us):  %d\t", b-a);
+
+        // we're ready to send more packets,
+        // enable interrupt service routine
+        enableInterrupt = true;
+    }
 }
-*/ // my code

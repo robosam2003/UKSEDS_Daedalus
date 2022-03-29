@@ -1,16 +1,16 @@
-
 /*
-   RadioLib SX127x Receive Example
+   RadioLib SX127x Receive with Interrupts Example
 
-   This example listens for LoRa transmissions using SX127x Lora modules.
-   To successfully receive data, the following settings have to be the same
-   on both transmitter and receiver:
+   This example listens for LoRa transmissions and tries to
+   receive them. Once a packet is received, an interrupt is
+   triggered. To successfully receive data, the following
+   settings have to be the same on both transmitter
+   and receiver:
     - carrier frequency
     - bandwidth
     - spreading factor
     - coding rate
     - sync word
-    - preamble length
 
    Other modules from SX127x/RFM9x family can also be used.
 
@@ -23,7 +23,6 @@
 
 // include the library
 #include <RadioLib.h>
-#include <Arduino.h>
 
 // SX1278 has the following connections:
 // NSS pin:   10
@@ -31,7 +30,7 @@
 // RESET pin: 9
 // DIO1 pin:  3
 RFM96 radio = new Module(10, 2, 9, 3);
-
+void setFlag();
 // or using RadioShield
 // https://github.com/jgromes/RadioShield
 //SX1278 radio = RadioShield.ModuleA;
@@ -40,8 +39,8 @@ void setup() {
     Serial.begin(9600);
 
     // initialize SX1278 with default settings
-    Serial.print(F("[SX1278] Initializing ... "));
-    int state = radio.begin();
+    Serial.print(F("[RFM96W] Initializing ... "));
+    int state = radio.begin(434.0, 500, 9, 7, RADIOLIB_SX127X_SYNC_WORD_LORAWAN, 17, 8, 0);
     if (state == RADIOLIB_ERR_NONE) {
         Serial.println(F("success!"));
     } else {
@@ -49,62 +48,116 @@ void setup() {
         Serial.println(state);
         while (true);
     }
+
+    // set the function that will be called
+    // when new packet is received
+    radio.setDio0Action(setFlag);
+
+    // start listening for LoRa packets
+    Serial.print(F("[RFM96W] Starting to listen ... "));
+    state = radio.startReceive();
+    if (state == RADIOLIB_ERR_NONE) {
+        Serial.println(F("success!"));
+    } else {
+        Serial.print(F("failed, code "));
+        Serial.println(state);
+        while (true);
+    }
+
+    // if needed, 'listen' mode can be disabled by calling
+    // any of the following methods:
+    //
+    // radio.standby()
+    // radio.sleep()
+    // radio.transmit();
+    // radio.receive();
+    // radio.readData();
+    // radio.scanChannel();
+}
+
+// flag to indicate that a packet was received
+volatile bool receivedFlag = false;
+
+// disable interrupt when it's not needed
+volatile bool enableInterrupt = true;
+
+// this function is called when a complete packet
+// is received by the module
+// IMPORTANT: this function MUST be 'void' type
+//            and MUST NOT have any arguments!
+#if defined(ESP8266) || defined(ESP32)
+ICACHE_RAM_ATTR
+#endif
+void setFlag() {
+    // check if the interrupt is enabled
+    if(!enableInterrupt) {
+        return;
+    }
+
+    // we got a packet, set the flag
+    receivedFlag = true;
 }
 
 void loop() {
-    Serial.print(F("[SX1278] Waiting for incoming transmission ... "));
+    // check if the flag is set
+    if(receivedFlag) {
+        // disable the interrupt service routine while
+        // processing the data
+        enableInterrupt = false;
 
-    // you can receive data as an Arduino String
-    // NOTE: receive() is a blocking method!
-    //       See example ReceiveInterrupt for details
-    //       on non-blocking reception method.
-    String str;
-    int state = radio.receive(str);
+        // reset flag
+        receivedFlag = false;
 
-    // you can also receive data as byte array
-    /*
-      byte byteArr[8];
-      int state = radio.receive(byteArr, 8);
-    */
+        // you can read received data as an Arduino String
+        //String str;
+        //int state = radio.readData(str);
 
-    if (state == RADIOLIB_ERR_NONE) {
-        // packet was successfully received
-        Serial.println(F("success!"));
+        // you can also read received data as byte array
 
-        // print the data of the packet
-        Serial.print(F("[SX1278] Data:\t\t\t"));
-        Serial.println(str);
+        byte byteArr[256];
+        int state = radio.readData(byteArr, 256);
 
-        // print the RSSI (Received Signal Strength Indicator)
-        // of the last received packet
-        Serial.print(F("[SX1278] RSSI:\t\t\t"));
-        Serial.print(radio.getRSSI());
-        Serial.println(F(" dBm"));
 
-        // print the SNR (Signal-to-Noise Ratio)
-        // of the last received packet
-        Serial.print(F("[SX1278] SNR:\t\t\t"));
-        Serial.print(radio.getSNR());
-        Serial.println(F(" dB"));
+        if (state == RADIOLIB_ERR_NONE) {
+            // packet was successfully received
+            Serial.println(F("[RFM96W] Received packet!"));
 
-        // print frequency error
-        // of the last received packet
-        Serial.print(F("[SX1278] Frequency error:\t"));
-        Serial.print(radio.getFrequencyError());
-        Serial.println(F(" Hz"));
+            // print data of the packet
+            Serial.print(F("[RFM96W] Data:\t\t\n"));
+            for (auto x : byteArr) { Serial.println(x); }
 
-    } else if (state == RADIOLIB_ERR_RX_TIMEOUT) {
-        // timeout occurred while waiting for a packet
-        Serial.println(F("timeout!"));
+            // print RSSI (Received Signal Strength Indicator)
+            Serial.print(F("[RFM96W] RSSI:\t\t"));
+            Serial.print(radio.getRSSI());
+            Serial.println(F(" dBm"));
 
-    } else if (state == RADIOLIB_ERR_CRC_MISMATCH) {
-        // packet was received, but is malformed
-        Serial.println(F("CRC error!"));
+            // print SNR (Signal-to-Noise Ratio)
+            Serial.print(F("[RFM96W] SNR:\t\t"));
+            Serial.print(radio.getSNR());
+            Serial.println(F(" dB"));
 
-    } else {
-        // some other error occurred
-        Serial.print(F("failed, code "));
-        Serial.println(state);
+            // print frequency error
+            Serial.print(F("[RFM96W] Frequency error:\t"));
+            Serial.print(radio.getFrequencyError());
+            Serial.println(F(" Hz"));
 
+        } else if (state == RADIOLIB_ERR_CRC_MISMATCH) {
+            // packet was received, but is malformed
+            Serial.println(F("[RFM96W] CRC error!"));
+
+        } else {
+            // some other error occurred
+            Serial.print(F("[RFM96W] Failed, code "));
+            Serial.println(state);
+
+        }
+
+        // put module back to listen mode
+        radio.startReceive();
+
+        // we're ready to receive more packets,
+        // enable interrupt service routine
+        enableInterrupt = true;
     }
+
 }
