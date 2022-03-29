@@ -20,11 +20,15 @@ void setFlag();
 int transmissionState = RADIOLIB_ERR_NONE;
 
 void setup() {
-    Serial.begin(9600);
+    Serial.begin(115200);
 
     // initialize SX1278 with default settings
     Serial.print(F("[SX1278] Initializing ... "));
-    int state = radio.beginFSK(434.0, 100, 10.0, 250, 10, 8, false);
+    int state = radio.beginFSK(434.0, 300, 100, 250, 17, 8, false);
+    uint8_t syncWord[] = {0x01, 0x23, 0x45, 0x67,
+                          0x89, 0xAB, 0xCD, 0xEF};
+    state = radio.setSyncWord(syncWord, 8);
+
     if (state == RADIOLIB_ERR_NONE) {
         Serial.println(F("success!"));
     } else {
@@ -105,7 +109,7 @@ void loop() {
         //radio.standby()
 
         // wait a second before transmitting again
-        delay(2);
+        delay(5);
 
         // send another one
         Serial.print(F("[RFM96W] Sending another packet ... "));
