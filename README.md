@@ -1,4 +1,4 @@
-# UKSEDS Team Dadalus
+# UKSEDS Team Daedalus
 
 The code and other files for the team Daedalus rocket.
 
