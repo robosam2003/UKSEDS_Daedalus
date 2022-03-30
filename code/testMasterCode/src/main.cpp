@@ -1,96 +1,65 @@
 #include <Arduino.h>
-#include <TinyGPS++.h>
-#include <SoftwareSerial.h>
+#include <BNO055.h>
+#include <SPI.h>
+#include <SimpleKalmanFilter.h>
 
-// Choose two Arduino pins to use for software serial
-int RXPin = 28;
-int TXPin = 29;
 
-int GPSBaud = 9600;
+// ADXL377 pins
+#define ADXL377_XPin 21
+#define ADXL377_YPin 22
+#define ADXL377_ZPin 23
 
-void displayInfo();
-// Create a TinyGPS++ object
-TinyGPSPlus gps;
-
-// Create a software serial port called "gpsSerial"
-SoftwareSerial gpsSerial(RXPin, TXPin);
+SimpleKalmanFilter FilteredAccADXL377_X = SimpleKalmanFilter(0.05, 0.05, 0.01);
+SimpleKalmanFilter FilteredAccADXL377_Y = SimpleKalmanFilter(0.05, 0.05, 0.01);
+SimpleKalmanFilter FilteredAccADXL377_Z = SimpleKalmanFilter(0.05, 0.05, 0.01);
+int scale = 200; // 3 (±3g) for ADXL337, 200 (±200g) for ADXL377
 
 void setup()
 {
-    // Start the Arduino hardware serial port at 9600 baud
-    Serial.begin(9600);
-
-    // Start the software serial port at the GPS's default baud
-    gpsSerial.begin(GPSBaud);
+    // Initialize serial communication at 115200 baud
+    Serial.begin(115200);
 }
 
+float mapf(float x, float in_min, float in_max, float out_min, float out_max)
+{
+    pinMode(ADXL377_XPin, INPUT);
+    pinMode(ADXL377_YPin, INPUT);
+    pinMode(ADXL377_ZPin, INPUT);
+    //analogReadRes(12);
+    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+// Read, scale, and print accelerometer data
 void loop()
 {
-    // This sketch displays information every time a new sentence is correctly encoded.
-    while (gpsSerial.available() > 0)
-        if (gps.encode(gpsSerial.read()))
-            displayInfo();
+    // Get raw accelerometer data for each axis
+    int rawX = analogRead(ADXL377_XPin);
+    int rawY = analogRead(ADXL377_YPin);
+    int rawZ = analogRead(ADXL377_ZPin);
 
-    // If 5000 milliseconds pass and there are no characters coming in
-    // over the software serial port, show a "No GPS detected" error
-    if (millis() > 5000 && gps.charsProcessed() < 10)
-    {
-        Serial.println("No GPS detected");
-        while(true);
-    }
+
+    // Scale accelerometer ADC readings into common units
+    // Scale map depends on if using a 5V or 3.3V microcontroller
+    float scaledX, scaledY, scaledZ; // Scaled values for each axis
+
+    scaledX = mapf(rawX, 0, 1023, -scale, scale);
+    scaledY = mapf(rawY, 0, 1023, -scale, scale);
+    scaledZ = mapf(rawZ, 0, 1023, -scale, scale);
+
+    // Print out raw X,Y,Z accelerometer readings
+    //Serial.print("X: "); Serial.println(rawX);
+    //Serial.print("Y: "); Serial.println(rawY);
+    //Serial.print("Z: "); Serial.println(rawZ);
+    //Serial.println();
+
+    // Print out scaled X,Y,Z accelerometer readings
+    Serial.print("X: "); Serial.print(scaledX); Serial.println(" g");
+    Serial.print("Y: "); Serial.print(scaledY); Serial.println(" g");
+    Serial.print("Z: "); Serial.print(scaledZ); Serial.println(" g");
+    Serial.println();
+
+    delay(100); // Minimum delay of 2 milliseconds between sensor reads (500 Hz)
 }
 
-void displayInfo()
-{
-    if (gps.location.isValid())
-    {
-        Serial.print("Latitude: ");
-        Serial.println(gps.location.lat(), 6);
-        Serial.print("Longitude: ");
-        Serial.println(gps.location.lng(), 6);
-        Serial.print("Altitude: ");
-        Serial.println(gps.altitude.meters());
-    }
-    else
-    {
-        Serial.println("Location: Not Available");
-    }
+// Same functionality as Arduino's standard map function, except using floats
 
-    Serial.print("Date: ");
-    if (gps.date.isValid())
-    {
-        Serial.print(gps.date.month());
-        Serial.print("/");
-        Serial.print(gps.date.day());
-        Serial.print("/");
-        Serial.println(gps.date.year());
-    }
-    else
-    {
-        Serial.println("Not Available");
-    }
-
-    Serial.print("Time: ");
-    if (gps.time.isValid())
-    {
-        if (gps.time.hour() < 10) Serial.print(F("0"));
-        Serial.print(gps.time.hour());
-        Serial.print(":");
-        if (gps.time.minute() < 10) Serial.print(F("0"));
-        Serial.print(gps.time.minute());
-        Serial.print(":");
-        if (gps.time.second() < 10) Serial.print(F("0"));
-        Serial.print(gps.time.second());
-        Serial.print(".");
-        if (gps.time.centisecond() < 10) Serial.print(F("0"));
-        Serial.println(gps.time.centisecond());
-    }
-    else
-    {
-        Serial.println("Not Available");
-    }
-
-    Serial.println();
-    Serial.println();
-    delay(1000);
-}
