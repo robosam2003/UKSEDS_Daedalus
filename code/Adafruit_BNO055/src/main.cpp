@@ -198,15 +198,12 @@ void calcRotationVect(double acc_meas[3], double ori[3], double returnVect[3]){ 
     double roll = ori[2]; // in radians
     double pitch = ori[1]; // in radians
     double heading = ori[0]; // in radians
-
     double rotMatX[3][3] = { {1, 0,          0         },
                              {0, cos(roll),  -sin(roll) },
                              {0, sin(roll), cos(roll) } };
-
     double rotMatY[3][3] = { { cos(pitch),  0, sin(pitch) },
                              { 0,           1, 0          },
                              { -sin(pitch), 0, cos(pitch) } };
-
     double rotMatZ[3][3] = { { cos(heading), -sin(heading), 0 },
                              { sin(heading), cos(heading),  0 },
                              { 0,            0,             1} };

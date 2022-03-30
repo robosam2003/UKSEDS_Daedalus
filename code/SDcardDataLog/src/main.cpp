@@ -3,14 +3,13 @@
 // Samuel Scott 12/01/2022
 
 #include <Arduino.h>
-#include <SPI.h>
+
 #include <SD.h>
 
 
 const int chipSelect = BUILTIN_SDCARD;
 elapsedMicros timer1;
 
-//#define button1 41
 
 //prototypes
 void logData();

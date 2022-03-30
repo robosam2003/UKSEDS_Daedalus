@@ -30,10 +30,10 @@ void setup() {
     state = radio.setSyncWord(syncWord, 8);
 
     if (state == RADIOLIB_ERR_NONE) {
-        Serial.println(F("success!"));
+        if (Serial) { Serial.println("success!");}
     } else {
-        Serial.print(F("failed, code "));
-        Serial.println(state);
+        if (Serial) { Serial.printf("failed, code ");}
+        if (Serial) { Serial.println(state);}
         while (true);
     }
 
@@ -42,7 +42,7 @@ void setup() {
     radio.setDio0Action(setFlag);
 
     // start transmitting the first packet
-    Serial.print(F("[RFM96W] Sending first packet ... "));
+    if (Serial) { Serial.printf("[RFM96W] Sending first packet ... ");}
 
     // you can transmit C-string or Arduino string up to
     // 256 characters long
@@ -77,10 +77,9 @@ void setFlag() {
     transmittedFlag = true;
 }
 
-
-int counter = 0;
-void loop() {
+void transmitData(byte arr[64]) { // TODO: This needs speeding up, currently takes over 7ms - not good.
     // check if the previous transmission finished
+    while (!transmittedFlag);
     if(transmittedFlag) {
         // disable the interrupt service routine while
         // processing the data
@@ -91,15 +90,15 @@ void loop() {
 
         if (transmissionState == RADIOLIB_ERR_NONE) {
             // packet was successfully sent
-            Serial.println(F("transmission finished!"));
+            if (Serial) { Serial.println("transmission finished!");}
 
             // NOTE: when using interrupt-driven transmit method,
             //       it is not possible to automatically measure
             //       transmission data rate using getDataRate()
 
         } else {
-            Serial.print(F("failed, code "));
-            Serial.println(transmissionState);
+            if (Serial) { Serial.printf("failed, code ");}
+            if (Serial) { Serial.println(transmissionState);}
 
         }
 
@@ -112,7 +111,7 @@ void loop() {
         delay(5);
 
         // send another one
-        Serial.print(F("[RFM96W] Sending another packet ... "));
+        if (Serial) { Serial.printf("[RFM96W] Sending another packet ... ");}
 
         // you can transmit C-string or Arduino string up to
         // 256 characters long
@@ -121,26 +120,34 @@ void loop() {
         // you can also transmit byte array up to 256 bytes long
 
         byte byteArr[63] = {};
-        for (int i=0; i<63; i++) { byteArr[i] = counter; }
+        for (int i=0; i<63; i++) { byteArr[i] = arr[i]; }
 
-        unsigned long a = microTimer;
         int state = radio.startTransmit(byteArr, 63); //
-        unsigned long b = microTimer;
-        Serial.printf("Transmission took (us):  %d\t", b-a);
-
         if (state == RADIOLIB_ERR_NONE) {
-            Serial.println(F("[RFM96W] Packet transmitted successfully!"));
+            if (Serial) { Serial.println("[RFM96W] Packet transmitted successfully!");}
         } else if (state == RADIOLIB_ERR_PACKET_TOO_LONG) {
-            Serial.println(F("[RFM96W] Packet too long!"));
+            if (Serial) { Serial.println(F("[RFM96W] Packet too long!"));}
         } else if (state == RADIOLIB_ERR_TX_TIMEOUT) {
-            Serial.println(F("[RFM96W] Timed out while transmitting!"));
+            if (Serial) { Serial.println(F("[RFM96W] Timed out while transmitting!"));}
         } else {
-            Serial.println(F("[RFM96W] Failed to transmit packet, code "));
-            Serial.println(state);
+            if (Serial) { Serial.println(F("[RFM96W] Failed to transmit packet, code "));}
+            if (Serial) { Serial.println(state);}
         }
         // we're ready to send more packets,
         // enable interrupt service routine
         enableInterrupt = true;
-        counter++;
     }
+}
+
+
+int counter = 0;
+byte arr[63] = {0};
+void loop() {
+    for (int i=0;i<63;i++) { arr[i] = counter; }
+    unsigned long a = micros();
+    transmitData(arr);
+    unsigned long b = micros();
+    if (Serial) { Serial.printf("Transmission took %d (us)\n", b-a); }
+    counter++;
+    delay(10);
 }

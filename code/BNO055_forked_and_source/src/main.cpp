@@ -42,6 +42,10 @@ bno055_calib_stat_t calibrate(){
 
 }
 
+double magnitude(Vector<double> vect){
+    return sqrt( sq(vect[0]) + sq(vect[1]) + sq(vect[2]) );
+}
+
 void calcRotationVect(Vector<double> acc_meas, Vector<double> ori, double returnVect[3]) {
     /// calculates the absolute acceleration (relative to north and flat) based on acceleration data and orientation data
     double degToRad = (2*pi)/360; // the ori returns data in degrees.
@@ -74,7 +78,6 @@ void calcRotationVect(Vector<double> acc_meas, Vector<double> ori, double return
         }
     }
 }
-
 
 Vector<double> find_offsets() {
     /// Should be done on a calibrated sensor
@@ -146,7 +149,6 @@ Vector<double> find_offsets() {
     return offsets;
 }
 
-
 void remove_offsets(Vector<double> offsets){
     short accOffsetX = (offsets[0]*100),
           accOffsetY = (offsets[1]*100),
@@ -193,7 +195,6 @@ void remove_offsets(Vector<double> offsets){
     }
 }
 
-
 void BNO055Init() {
     delay(2000);
     sensor.setPowerMode(NORMAL);
@@ -210,6 +211,7 @@ void BNO055Init() {
 
 }
 
+
 void setup() {
     pinMode(LED_BUILTIN, OUTPUT);
     Wire.begin();
@@ -219,11 +221,6 @@ void setup() {
     BNO055Init();
 
 }
-
-double magnitude(Vector<double> vect){
-    return sqrt( sq(vect[0]) + sq(vect[1]) + sq(vect[2]) );
-}
-
 
 
 void loop() {
