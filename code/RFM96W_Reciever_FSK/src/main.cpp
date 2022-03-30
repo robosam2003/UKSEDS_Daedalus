@@ -121,7 +121,6 @@ void loop() {
         // you can also read received data as byte array
 
         byte byteArr[63];
-        unsigned long a = micros();
         int state = radio.readData(byteArr, 63);
         unsigned long b = micros();
         //Serial.print("Reading takes (us) :   ");
