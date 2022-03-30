@@ -26,10 +26,10 @@ void loop()
     scaledZ = mapf(rawZ, 0, 1023, -scale, scale);
   
   // Print out raw X,Y,Z accelerometer readings
-  Serial.print("X: "); Serial.println(rawX);
-  Serial.print("Y: "); Serial.println(rawY);
-  Serial.print("Z: "); Serial.println(rawZ);
-  Serial.println();
+  //Serial.print("X: "); Serial.println(rawX);
+  //Serial.print("Y: "); Serial.println(rawY);
+  //Serial.print("Z: "); Serial.println(rawZ);
+  //Serial.println();
   
   // Print out scaled X,Y,Z accelerometer readings
   Serial.print("X: "); Serial.print(scaledX); Serial.println(" g");
