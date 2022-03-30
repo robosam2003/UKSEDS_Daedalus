@@ -398,7 +398,7 @@ void setup(void) {
     Wire.setClock(1000000);  // i2c seems to work great at 1Mhz, but may need to run on 400kHz or even 100Khz if we have issues.
     pinMode(LED_BUILTIN, OUTPUT);
     init();
-    //calibrate();
+    calibrate();
     remove_offsets();
 
     delay(1000);
@@ -471,6 +471,8 @@ void loop() {
 
     for (int i=0; i<3; i++) { trueAccVectKf[i] =  AccKF[i].updateEstimate(static_cast<float>(trueAccVect[i])); }
     trueAccVectKf[2] -= static_cast<float>(mag_grav);
+
+
     //dead reckoning attempt
     unsigned long b = t1;
 
