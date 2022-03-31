@@ -7,6 +7,8 @@
 #include "SdFat.h"
 
 
+#define LOG_FILE_SIZE 10*25000*600 // TODO: What size file do we need????
+
 SdFat32 sd;
 File32 file;
 const int chipSelect = 254;
@@ -19,6 +21,7 @@ struct dataStruct {
     uint16_t acc_rawx;
     uint16_t acc_rawy;
     uint16_t acc_rawz;
+    byte arr[464];
 };
 
 
@@ -32,29 +35,45 @@ void setup() {
         Serial.println("Could not mount SD card");
         while (true);
     }
+
+    if (!file.open("dataLog11.bin", O_CREAT | O_WRITE)) {
+        Serial.println("Could not open file!");
+    }
+    // File must be pre-allocated to avoid huge
+    // delays searching for free clusters.
+    /*if (!file.preAllocate(LOG_FILE_SIZE)) { // if i dont preallocate, there;s an extra 3-5ms delay in writing
+        Serial.println("preAllocate failed\n");
+        file.close();
+        return;
+    }*/
     Serial.println("Card initialised");
 }
 
 
 void logData(byte arr[512]) {  /// SDFat has a 512 byte buffer, so we only need to flush after 512 bytes have been written to the buffer
-    if (!file.write((const uint8_t*)&arr, 512)) {
+    /*if (!file) {
         Serial.println("Error: write halted");
     }
+    for(int i=0;i<512;i++) { file.printf("%d,",arr[i]); }
+    file.printf("\n");*/
+    if (!file.write(arr, 512));
 }
 
 void logData(struct dataStruct data) {  /// SDFat has a 512 byte buffer, so we only need to flush after 512 bytes have been written to the buffer
-    if (!file.write((const uint8_t*)&data, sizeof(data))) {
+    if (!file.printf("%d,%d,%d,", data.acc_rawx, data.acc_rawy, data.acc_rawz)) {
+
         Serial.println("Error: write halted");
     }
+    for (int i=0;i<464;i++) { file.printf("%d,", data.arr[i]); } // TODO: How do we write a struct to a page of flash like joeyB said???? - Tha would be mega fast.
+    file.printf("\n");
 }
 
 void loop() {
-    if (!file.open("dataLog1.txt", O_CREAT | O_WRITE)) {
-        Serial.println("Could not open file!");
-    }
-    byte byteArr[512];
-    for (int a=0;a<512;a++){ byteArr[a] = a;}
-    for(int j=0;j<10;j++) {
+
+    byte byteArr[512] = {1, 2, 3, 5, 6, 7, 8, 9, 255, 13};
+    //for (int a=0;a<512;a++){ byteArr[a] = a;}
+    //struct dataStruct mydata = {1,2,32, {3}};
+    while(1){
         unsigned long a = micros();
         logData(byteArr); // 512 bytes
         unsigned long b = micros();
@@ -65,11 +84,9 @@ void loop() {
         unsigned long afterFlush = micros();
         Serial.printf("To flush 512 bytes it takes: %d\n", afterFlush - beforeFlush);
         Serial.printf("Total time %d\n", afterFlush - a);
+        delay(10);
     }
-    file.close();
-    delay(3000);
-
-
+    //file.close();
 
 
 }
