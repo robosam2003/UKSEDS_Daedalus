@@ -3,12 +3,18 @@
 // Samuel Scott 12/01/2022
 
 #include <Arduino.h>
-
+#include <SPI.h>
 #include <SD.h>
 
 
 const int chipSelect = BUILTIN_SDCARD;
 elapsedMicros timer1;
+
+struct dataStruct {
+    uint16_t acc_rawx;
+    uint16_t acc_rawy;
+    uint16_t acc_rawz;
+};
 
 
 //prototypes
@@ -33,39 +39,38 @@ void setup() {
     Serial.println("Card initialised");
 }
 
+File SDCardInit(){
+    /// use O_CREAT | O_WRITE for faster write times :)
+    File dataFile = SD.open("dataLog1.dat", O_CREAT | O_WRITE);
+    return dataFile;
+}
 
-void logData() {
-    int start = timer1;
-    //SD.mkdir("a"); // this creates all subdirectories as well
-    int madeADir = timer1;
-    File dataFile = SD.open("a/testFile3.txt", FILE_WRITE);
-    int openedFile = timer1;
-    int wrote20Bytes = 0;
-    int closeFile = 0;
+void logData(File dataFile, struct dataStruct data) {  /// SDFat has a 512 byte buffer, so we only need to flush after 512 bytes have been written to the buffer
     if (dataFile) {
-
-        dataFile.println("THIS IS 20 BYTES.... now with flushing hehe");
-        wrote20Bytes = timer1;
-        dataFile.flush();
-        //dataFile.close();
-        closeFile = timer1;
-
-        //Serial.println(timer1);
-
+        dataFile.write((const uint8_t *)&data, sizeof(data));
     }
     else{
         Serial.println("Some error has occured");
     }
-    Serial.printf("To make a DIR:      %d: \n", madeADir-start);
-    Serial.printf("To open the file:   %d: \n", openedFile-madeADir);
-    Serial.printf("To write 20 bytes:  %d: \n", wrote20Bytes - openedFile);
-    Serial.printf("To flush the file:  %d: \n", closeFile- wrote20Bytes);
-    Serial.printf("TOTAL TIME :        %d: \n\n", closeFile-start);
 }
 
 void loop() {
-
-    logData();
+    struct dataStruct mydata = {0,0,0};
+    File dataFile = SDCardInit();
+    for (int i=0;i<10;i++) {
+        mydata.acc_rawx = i;
+        mydata.acc_rawy = i+1;
+        mydata.acc_rawz = i+2;
+        unsigned long a = micros();
+        logData(dataFile, mydata);
+        unsigned long b = micros();
+        Serial.println(b-a);
+    }
+    unsigned long beforeFlush = micros();
+    dataFile.flush();
+    unsigned long afterFlush = micros();
+    Serial.printf("To flush 512 bytes it takes: %d\n", afterFlush-beforeFlush);
+    dataFile.close();
     delay(3000);
 
 
