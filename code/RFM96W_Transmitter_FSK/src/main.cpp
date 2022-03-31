@@ -20,7 +20,7 @@ void setFlag();
 int transmissionState = RADIOLIB_ERR_NONE;
 
 void setup() {
-    Serial.begin(115200);
+    Serial.begin(500000);
 
     // initialize SX1278 with default settings
     Serial.print(F("[SX1278] Initializing ... "));
@@ -90,7 +90,7 @@ void transmitData(byte arr[64]) { // TODO: This needs speeding up, currently tak
 
         if (transmissionState == RADIOLIB_ERR_NONE) {
             // packet was successfully sent
-            if (Serial) { Serial.println("transmission finished!");}
+            //if (Serial) { Serial.println("transmission finished!");}
 
             // NOTE: when using interrupt-driven transmit method,
             //       it is not possible to automatically measure
@@ -111,7 +111,7 @@ void transmitData(byte arr[64]) { // TODO: This needs speeding up, currently tak
         delay(5);
 
         // send another one
-        if (Serial) { Serial.printf("[RFM96W] Sending another packet ... ");}
+        //if (Serial) { Serial.printf("[RFM96W] Sending another packet ... ");}
 
         // you can transmit C-string or Arduino string up to
         // 256 characters long
@@ -124,7 +124,7 @@ void transmitData(byte arr[64]) { // TODO: This needs speeding up, currently tak
 
         int state = radio.startTransmit(byteArr, 63); //
         if (state == RADIOLIB_ERR_NONE) {
-            if (Serial) { Serial.println("[RFM96W] Packet transmitted successfully!");}
+            //if (Serial) { Serial.println("[RFM96W] Packet transmitted successfully!");}
         } else if (state == RADIOLIB_ERR_PACKET_TOO_LONG) {
             if (Serial) { Serial.println(F("[RFM96W] Packet too long!"));}
         } else if (state == RADIOLIB_ERR_TX_TIMEOUT) {
@@ -150,4 +150,5 @@ void loop() {
     if (Serial) { Serial.printf("Transmission took %d (us)\n", b-a); }
     counter++;
     delay(10);
+
 }
