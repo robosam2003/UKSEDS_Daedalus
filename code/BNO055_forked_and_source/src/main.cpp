@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include "BNO055.h"
-#include "Wire.h"
+#include "i2c_driver_wire.h"
 #include "SimpleKalmanFilter.h"
 
 const byte BNO055_I2C_ADDRESS = 0x28;
@@ -164,7 +164,7 @@ Vector<double> find_gyr_offsets() {
     bool offsets_calibrated = false;
     int counter = 0;
 
-    const int num = 1024;
+    const int num = 512;
     double gyr_biases_x[num] = {0};
     double gyr_biases_y[num] = {0};
     double gyr_biases_z[num] = {0};
@@ -187,7 +187,7 @@ Vector<double> find_gyr_offsets() {
         bool within_range_x = true;
         bool within_range_y = true;
         bool within_range_z = true;
-        if (counter > (2 * num)) {
+        if (counter > (num)) {
             for (auto ax: gyr_biases_x) { avg_x += ax; }
             for (auto ay: gyr_biases_y) { avg_y += ay; }
             for (auto az: gyr_biases_z) { avg_z += az; }
@@ -267,29 +267,37 @@ void BNO055Init() {
     delay(2000);
     sensor.setPowerMode(NORMAL);
     sensor.setOperationMode(CONFIGMODE); // registers must be configured in config mode
-    sensor.setAccelerometerConfig(0b00000011); //16G
-    sensor.writeRegister(BNO055_UNIT_SEL, 0b00000000); // Celsius, degrees, dps, m/s^2
-    //sensor.writeRegister(BNO055_AXIS_MAP_CONFIG, 0x24); // TODO: Check that this will be correct for our pcb (Axis remap);
-    sensor.writeRegister(BNO055_AXIS_MAP_SIGN, 0b00000000);
+
 
     //calibrate();
-    acc_offsets = find_acc_offsets();
-    gyr_offsets = find_gyr_offsets();
+    //acc_offsets = find_acc_offsets();
+    //gyr_offsets = find_gyr_offsets();
     //remove_offsets(acc_offsets, gyr_offsets);
-    sensor.setOperationMode(AMG); // using AMG for non-fusion mode.
+    sensor.setOperationMode(AMG);
+
+    sensor.writeRegister(BNO055_UNIT_SEL, 0b00000000); // Celsius, degrees, dps, m/s^2
+    sensor.setAccelerometerConfig(0b00011011); //Normal mode, 500Hz, 16G
+    sensor.setGyroscopeConfig(0b00000000); // 523 Hz, 2000dps
+    sensor.setGyroscopeOperationMode(0b00000000); // Normal mode : 0bxxxxx000
+    sensor.setMagnetometerConfig(0b00011111);
+
+    //sensor.writeRegister(BNO055_AXIS_MAP_CONFIG, 0x24); // TODO: Check that this will be correct for our pcb (Axis remap);
+    sensor.writeRegister(BNO055_AXIS_MAP_SIGN, 0b00000000);
 
 }
 
 void BNO055Setup() {
     pinMode(LED_BUILTIN, OUTPUT);
-    Wire.begin();
-    Wire.setClock(1000000);  // i2c seems to work great at 1Mhz
-    delay(1000);
+
+
     sensor.begin();
     BNO055Init();
 }
 
 void setup() {
+    Wire.setClock(1000000);  // i2c seems to work great at 1Mhz
+    Wire.begin();
+
     BNO055Setup();
 
 }
@@ -309,12 +317,16 @@ double returnVect[9] = {0,0,0, 0,0,0, 0,0,0}; // posx, posy, posz, velx, vely, v
 void loop() {
     uint32_t startOfLoop = micros();
     /// Data Aquisition
-    Vector<double> BNO055acc = sensor.getRawAcceleration();
-    Vector<double> mag = sensor.getRawMagnetometer();
-    Vector<double> gyro = sensor.getRawGyro();
+    bno055_burst_t data = sensor.getAllData();
+    Vector<double> BNO055acc = data.accel;
+    Vector<double> mag = data.mag;
+    Vector<double> gyro = data.gyro;
+
+    uint32_t b = micros();
+    Serial.println(b-startOfLoop);
 
     /// removing offsets, for internal gyroscope integration. Higher precision of calculation this way.
-    for(int i=0;i<3;i++) { BNO055acc[i] -= acc_offsets[0]; gyro[i] -= gyr_offsets[i]; }
+   // for(int i=0;i<3;i++) { BNO055acc[i] -= acc_offsets[0]; gyro[i] -= gyr_offsets[i]; }
 
 //    eul[0] = 360-eul[0];   eul[1] = -eul[1];  // necessary to have all the angles going anticlockise-> increasing. - for the reference frame conversion.
 
@@ -322,7 +334,7 @@ void loop() {
 
 /// Kalman filtering
 
-    updateFilters(gyro, BNO055acc);
+    //updateFilters(gyro, BNO055acc);
 
 
     /// Calculations
@@ -331,10 +343,11 @@ void loop() {
 
 
 
-    Serial.printf("%lf,  %lf,  %lf  \n", returnVect[6], returnVect[7], returnVect[8]);
+    //Serial.printf("%lf,  %lf,  %lf  \n", returnVect[6], returnVect[7], returnVect[8]);
 
 
 
     uint32_t endOfLoop = micros();
-    delayMicroseconds(10000- (endOfLoop - startOfLoop) );
+
+    delayMicroseconds(((endOfLoop-startOfLoop) < 10000 ) ? (10000- (endOfLoop - startOfLoop) ) : 0);
 }
