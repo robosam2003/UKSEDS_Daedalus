@@ -6,6 +6,9 @@
 const byte BNO055_I2C_ADDRESS = 0x28;
 BNO055 sensor(BNO055_I2C_ADDRESS, &Wire);
 
+Vector<double> acc_offsets;
+Vector<double> gyr_offsets;
+
 SimpleKalmanFilter filteredAccX = SimpleKalmanFilter(0.05, 0.05, 0.01);
 SimpleKalmanFilter filteredAccY = SimpleKalmanFilter(0.05, 0.05, 0.01);
 SimpleKalmanFilter filteredAccZ = SimpleKalmanFilter(0.05, 0.05, 0.01);
@@ -161,7 +164,7 @@ Vector<double> find_gyr_offsets() {
     bool offsets_calibrated = false;
     int counter = 0;
 
-    const int num = 127;
+    const int num = 1024;
     double gyr_biases_x[num] = {0};
     double gyr_biases_y[num] = {0};
     double gyr_biases_z[num] = {0};
@@ -270,10 +273,10 @@ void BNO055Init() {
     sensor.writeRegister(BNO055_AXIS_MAP_SIGN, 0b00000000);
 
     //calibrate();
-    Vector<double> acc_offsets = find_acc_offsets();
-    Vector<double> gyr_offsets = find_gyr_offsets();
-    remove_offsets(acc_offsets, gyr_offsets);
-    sensor.setOperationMode(AMG);
+    acc_offsets = find_acc_offsets();
+    gyr_offsets = find_gyr_offsets();
+    //remove_offsets(acc_offsets, gyr_offsets);
+    sensor.setOperationMode(AMG); // using AMG for non-fusion mode.
 
 }
 
@@ -291,44 +294,47 @@ void setup() {
 
 }
 
-void deadReckoning(Vector<double> acc, Vector<double> gyr, int updateTimeUs, double returnVect[6] ){
+void deadReckoning(Vector<double> acc, Vector<double> gyr, int updateTimeUs, double returnVect[9] ) {
+    for (int i=0;i<3;i++) {
+        returnVect[6+i] += gyr[i]*(updateTimeUs*0.000001); /// Zero order hold for now, may convert to first order at some point.#
 
+        // Do reference frame conversion before this step. and also minus gravity,
+        returnVect[3+i] += acc[i]*(updateTimeUs*0.000001); /// Velocity calculation, zero order hold.
+        returnVect[i]   += returnVect[3+i]*(updateTimeUs*0.000001); /// position calculation, zero order hold
+    }
 }
 
+double returnVect[9] = {0,0,0, 0,0,0, 0,0,0}; // posx, posy, posz, velx, vely, velz, heading, pitch, roll // initially starts at zero.
+// should start at ori from NDFOF mode.
 void loop() {
-    unsigned long a = micros();
-
+    uint32_t startOfLoop = micros();
     /// Data Aquisition
     Vector<double> BNO055acc = sensor.getRawAcceleration();
     Vector<double> mag = sensor.getRawMagnetometer();
     Vector<double> gyro = sensor.getRawGyro();
-//    Vector<double> lia = sensor.getLinearAcceleration();
-//    Vector<double> grav = sensor.getGravity();
-//    Vector<double> eul = sensor.getEuler();
+
+    /// removing offsets, for internal gyroscope integration. Higher precision of calculation this way.
+    for(int i=0;i<3;i++) { BNO055acc[i] -= acc_offsets[0]; gyro[i] -= gyr_offsets[i]; }
 
 //    eul[0] = 360-eul[0];   eul[1] = -eul[1];  // necessary to have all the angles going anticlockise-> increasing. - for the reference frame conversion.
 
+/// --------------------------------------------------------------------------------------
 
-
-    unsigned long b = micros();
+/// Kalman filtering
 
     updateFilters(gyro, BNO055acc);
 
-    double returnVect[6] = {}; // posx, posy, posz , heading, pitch, roll
 
     /// Calculations
-
-//    Vector<double> tav = {};
-//    calcRotationVect(BNO055acc, eul, tav);
+    deadReckoning(filteredAcc, filteredGyro, 10000, returnVect);
 
 
 
 
-
-    Serial.printf("%lf,  %lf,  %lf  \n", filteredGyro[0], filteredGyro[1], filteredGyro[2]);
-
+    Serial.printf("%lf,  %lf,  %lf  \n", returnVect[6], returnVect[7], returnVect[8]);
 
 
 
-    delayMicroseconds(10000);
+    uint32_t endOfLoop = micros();
+    delayMicroseconds(10000- (endOfLoop - startOfLoop) );
 }
