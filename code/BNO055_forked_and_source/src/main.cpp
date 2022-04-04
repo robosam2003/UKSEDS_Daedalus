@@ -6,8 +6,17 @@
 const byte BNO055_I2C_ADDRESS = 0x28;
 BNO055 sensor(BNO055_I2C_ADDRESS, &Wire);
 
-Vector<double> acc_offsets;
+Vector<double> acc_offsets; // offsets / biases for the accelerometers and gyros
 Vector<double> gyr_offsets;
+
+/// Holds previous values of (true acceleration), velocity and omega (from gyro)
+double prevVect[9] = {0,0,0, // Needed for the First order hold.
+                      0,0,0,
+                      0,0,0};
+Vector<double> pos = {}; // For dead reckoning purposes.
+Vector<double> vel = {};
+Vector<double> trueAccVect = {};
+Vector<double> ori = {};
 
 SimpleKalmanFilter filteredAccX = SimpleKalmanFilter(0.05, 0.05, 0.01);
 SimpleKalmanFilter filteredAccY = SimpleKalmanFilter(0.05, 0.05, 0.01);
@@ -294,20 +303,31 @@ void setup() {
 
 }
 
-void deadReckoning(Vector<double> acc, Vector<double> gyr, int updateTimeUs, double prevValues[6], double returnVect[9] ) {
+void deadReckoning(Vector<double> acc, Vector<double> omega, int updateTimeUs, double prevValues[9],
+                   Vector<double> pos, Vector<double> vel, Vector<double> ori ) {
+    /// omega (angular velocity) is pulled directly from a filtered gyro estimate.
+    /// acc is the acceleration pulled straight from the accelerometers, conversion is done internally.
     for (int i=0;i<3;i++) {
+        /// Integration of angular velocity, First order hold (trapezium rule)
+        ori[i] += (updateTimeUs * 0.000001) * 0.5 * (omega[2 - i] + prevValues[8 - i]);
+        prevValues[8-i] = omega[2-i]; // setting previous value of omega for next time.
+    }
+    calcRotationVect(acc, ori, trueAccVect);
+    trueAccVect[2] -= 9.81;
+    // TODO: reference frame conversion before this step. and also minus gravity,
+    for(int i=0;i<3;i++) {
+        /// Velocity calculation, First order hold.
+        vel[i] += (updateTimeUs*0.000001)*0.5*(trueAccVect[i] + prevValues[i]) ;
+        prevValues[i] = trueAccVect[i]; // setting previous value of acceleration for next time
+        /// Position calculation, First order hold
+        pos[i] += (updateTimeUs*0.000001)*0.5*(vel[i] + prevValues[2+i]);
 
-        returnVect[6+i] += (updateTimeUs*0.000001)*0.5*(gyr[2-i] + prevValues[5-i]); /// integration of angular velocity, first order hold.
-
-        // Do reference frame conversion before this step. and also minus gravity,
-        returnVect[3+i] += acc[i]*(updateTimeUs*0.000001); /// Velocity calculation, zero order hold.
-        returnVect[i]   += returnVect[3+i]*(updateTimeUs*0.000001); /// position calculation, zero order hold
+        prevValues[2+i] = vel[i]; // setting previous value of velocity for next time.
     }
 }
 
-double returnVect[9] = {0,0,0, 0,0,0, 0,0,0}; // posx, posy, posz, velx, vely, velz, heading, pitch, roll // initially starts at zero.
-double prevVect[6] = {0,0,0, 0,0,0}; // previous values of acceleration, and gyro
-// should start at ori from NDFOF mode.
+
+
 void loop() {
     uint32_t startOfLoop = micros();
     /// Data Aquisition
@@ -329,12 +349,10 @@ void loop() {
 
 
     /// Calculations
-    deadReckoning(filteredAcc, filteredGyro, 10000, prevVect, returnVect);
-    for(int i=0;i<3;i++) { prevVect[i] = BNO055acc[i]; prevVect[3+i] = gyro[i]; }
+    deadReckoning(filteredAcc, filteredGyro, 10000, prevVect, pos, vel, ori);
 
 
-
-    Serial.printf("%lf,  %lf,  %lf  \n", returnVect[6], returnVect[7], returnVect[8]);
+    Serial.printf("%lf,  %lf,  %lf    %lf,  %lf,  %lf,    \n", ori[0], ori[1], ori[2], pos[0], pos[1], pos[2]);
 
 
 
