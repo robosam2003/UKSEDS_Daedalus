@@ -36,7 +36,7 @@ void setup() {
         while (true);
     }
 
-    if (!file.open("dataLog16.csv", O_CREAT | O_WRITE)) {
+    if (!file.open("dataLog19.bin", O_CREAT | O_WRITE)) {
         Serial.println("Could not open file!");
     }
     // File must be pre-allocated to avoid huge
@@ -62,19 +62,19 @@ void logData(byte arr[512]) {  /// SDFat has a 512 byte buffer, so we only need 
 }
 
 void logData(struct dataStruct data) {  /// SDFat has a 512 byte buffer, so we only need to flush after 512 bytes have been written to the buffer
-    if (!file.printf("%d,%d,%d,\n", data.acc_rawx, data.acc_rawy, data.acc_rawz)) {
+    if (!file.printf("%d,%d,%d,", data.acc_rawx, data.acc_rawy, data.acc_rawz)) {
 
         Serial.println("Error: write halted");
     }
-    //for (int i=0;i<464;i++) { file.printf("%d,", data.arr[i]); } // TODO: How do we write a struct to a page of flash like joeyB said???? - That would be mega fast.
-    //file.printf("\n");
+    for (int i=0;i<464;i++) { file.printf("%d,", data.arr[i]); } // TODO: How do we write a struct to a page of flash like joeyB said???? - That would be mega fast.
+    file.printf("\n");
 }
 
 void loop() {
 
-    byte byteArr[512] = {1, 2, 3, 5, 6, 7, 8, 9, 255, 13};
+    //byte byteArr[512] = {1, 2, 3, 5, 6, 7, 8, 9, 255, 13};
     //for (int a=0;a<512;a++){ byteArr[a] = a;}
-    struct dataStruct mydata = {1,2,32};
+    struct dataStruct mydata = {1,2,32, {3, 32, 123}};
     while(1){
         unsigned long a = micros(); // IS SERIAL WRITE SLOWING IT DOWN????
         logData(mydata); // 512 bytes
