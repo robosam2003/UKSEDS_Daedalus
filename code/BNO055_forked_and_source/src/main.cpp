@@ -263,15 +263,15 @@ void remove_offsets(Vector<double> acc_offsets, Vector<double> gyrOffsets){
     }
 }
 
-void BNO055Init() {
-    delay(2000);
+void BNO055Setup() {
+    sensor.begin();
     sensor.setPowerMode(NORMAL);
     sensor.setOperationMode(CONFIGMODE); // registers must be configured in config mode
 
-
     //calibrate();
-    //acc_offsets = find_acc_offsets();
-    //gyr_offsets = find_gyr_offsets();
+    //
+    acc_offsets = find_acc_offsets();
+    gyr_offsets = find_gyr_offsets();
     //remove_offsets(acc_offsets, gyr_offsets);
     sensor.setOperationMode(AMG);
 
@@ -286,14 +286,6 @@ void BNO055Init() {
 
 }
 
-void BNO055Setup() {
-    pinMode(LED_BUILTIN, OUTPUT);
-
-
-    sensor.begin();
-    BNO055Init();
-}
-
 void setup() {
     Wire.setClock(1000000);  // i2c seems to work great at 1Mhz
     Wire.begin();
@@ -302,9 +294,10 @@ void setup() {
 
 }
 
-void deadReckoning(Vector<double> acc, Vector<double> gyr, int updateTimeUs, double returnVect[9] ) {
+void deadReckoning(Vector<double> acc, Vector<double> gyr, int updateTimeUs, double prevValues[6], double returnVect[9] ) {
     for (int i=0;i<3;i++) {
-        returnVect[6+i] += gyr[i]*(updateTimeUs*0.000001); /// Zero order hold for now, may convert to first order at some point.#
+
+        returnVect[6+i] += (updateTimeUs*0.000001)*0.5*(gyr[2-i] + prevValues[5-i]); /// integration of angular velocity, first order hold.
 
         // Do reference frame conversion before this step. and also minus gravity,
         returnVect[3+i] += acc[i]*(updateTimeUs*0.000001); /// Velocity calculation, zero order hold.
@@ -313,6 +306,7 @@ void deadReckoning(Vector<double> acc, Vector<double> gyr, int updateTimeUs, dou
 }
 
 double returnVect[9] = {0,0,0, 0,0,0, 0,0,0}; // posx, posy, posz, velx, vely, velz, heading, pitch, roll // initially starts at zero.
+double prevVect[6] = {0,0,0, 0,0,0}; // previous values of acceleration, and gyro
 // should start at ori from NDFOF mode.
 void loop() {
     uint32_t startOfLoop = micros();
@@ -322,28 +316,25 @@ void loop() {
     Vector<double> mag = data.mag;
     Vector<double> gyro = data.gyro;
 
-    uint32_t b = micros();
-    Serial.println(b-startOfLoop);
-
     /// removing offsets, for internal gyroscope integration. Higher precision of calculation this way.
-   // for(int i=0;i<3;i++) { BNO055acc[i] -= acc_offsets[0]; gyro[i] -= gyr_offsets[i]; }
+    for(int i=0;i<3;i++) { BNO055acc[i] -= acc_offsets[0]; gyro[i] -= gyr_offsets[i]; }
 
-//    eul[0] = 360-eul[0];   eul[1] = -eul[1];  // necessary to have all the angles going anticlockise-> increasing. - for the reference frame conversion.
+    //eul[0] = 360-eul[0];   eul[1] = -eul[1];  // necessary to have all the angles going anticlockise-> increasing. - for the reference frame conversion.
 
 /// --------------------------------------------------------------------------------------
 
 /// Kalman filtering
 
-    //updateFilters(gyro, BNO055acc);
+    updateFilters(gyro, BNO055acc);
 
 
     /// Calculations
-    deadReckoning(filteredAcc, filteredGyro, 10000, returnVect);
+    deadReckoning(filteredAcc, filteredGyro, 10000, prevVect, returnVect);
+    for(int i=0;i<3;i++) { prevVect[i] = BNO055acc[i]; prevVect[3+i] = gyro[i]; }
 
 
 
-
-    //Serial.printf("%lf,  %lf,  %lf  \n", returnVect[6], returnVect[7], returnVect[8]);
+    Serial.printf("%lf,  %lf,  %lf  \n", returnVect[6], returnVect[7], returnVect[8]);
 
 
 
