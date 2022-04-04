@@ -15,7 +15,6 @@ double prevVect[9] = {0,0,0, // Needed for the First order hold.
                       0,0,0};
 Vector<double> pos = {}; // For dead reckoning purposes.
 Vector<double> vel = {};
-Vector<double> trueAccVect = {};
 Vector<double> ori = {};
 
 SimpleKalmanFilter filteredAccX = SimpleKalmanFilter(0.05, 0.05, 0.01);
@@ -304,7 +303,7 @@ void setup() {
 }
 
 void deadReckoning(Vector<double> acc, Vector<double> omega, int updateTimeUs, double prevValues[9],
-                   Vector<double> pos, Vector<double> vel, Vector<double> ori ) {
+                   Vector<double> &pos, Vector<double> &vel, Vector<double> &ori ) {
     /// omega (angular velocity) is pulled directly from a filtered gyro estimate.
     /// acc is the acceleration pulled straight from the accelerometers, conversion is done internally.
     for (int i=0;i<3;i++) {
@@ -312,6 +311,7 @@ void deadReckoning(Vector<double> acc, Vector<double> omega, int updateTimeUs, d
         ori[i] += (updateTimeUs * 0.000001) * 0.5 * (omega[2 - i] + prevValues[8 - i]);
         prevValues[8-i] = omega[2-i]; // setting previous value of omega for next time.
     }
+    Vector<double> trueAccVect = {};
     calcRotationVect(acc, ori, trueAccVect);
     trueAccVect[2] -= 9.81;
     // TODO: reference frame conversion before this step. and also minus gravity,
@@ -337,7 +337,7 @@ void loop() {
     Vector<double> gyro = data.gyro;
 
     /// removing offsets, for internal gyroscope integration. Higher precision of calculation this way.
-    for(int i=0;i<3;i++) { BNO055acc[i] -= acc_offsets[0]; gyro[i] -= gyr_offsets[i]; }
+    for(int i=0;i<3;i++) { BNO055acc[i] += acc_offsets[0]; gyro[i] -= gyr_offsets[i]; }
 
     //eul[0] = 360-eul[0];   eul[1] = -eul[1];  // necessary to have all the angles going anticlockise-> increasing. - for the reference frame conversion.
 
@@ -352,7 +352,7 @@ void loop() {
     deadReckoning(filteredAcc, filteredGyro, 10000, prevVect, pos, vel, ori);
 
 
-    Serial.printf("%lf,  %lf,  %lf    %lf,  %lf,  %lf,    \n", ori[0], ori[1], ori[2], pos[0], pos[1], pos[2]);
+    Serial.printf("ACC: %lf,  %lf,  %lf   VEL: %lf,  %lf,  %lf,   POS: %lf,  %lf,  %lf\n", BNO055acc[0], BNO055acc[1], BNO055acc[2], vel[0], vel[1], vel[2], pos[0], pos[1], pos[2]);
 
 
 
