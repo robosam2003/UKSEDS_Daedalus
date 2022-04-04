@@ -1,4 +1,3 @@
-Things to look at:
 
 - Note: using exFat formatting slows things down
 
