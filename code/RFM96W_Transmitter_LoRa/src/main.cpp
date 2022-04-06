@@ -24,7 +24,7 @@ void setup() {
 
     // initialize SX1278 with default settings
     Serial.print(F("[SX1278] Initializing ... "));
-    int state = radio.begin(434.0, 125, 6, 5, RADIOLIB_SX127X_SYNC_WORD_LORAWAN, 17, 8, 0);
+    int state = radio.begin(434.0, 500, 8, 7, RADIOLIB_SX127X_SYNC_WORD_LORAWAN, 17, 8, 0);
     if (state == RADIOLIB_ERR_NONE) {
         if (Serial) { Serial.println(F("success!"));}
     } else {
@@ -115,7 +115,7 @@ void transmitData(byte arr[]) {
         for (int i=0; i<255; i++) { byteArr[i] = arr[i]; }
 
 
-        int state = radio.startTransmit(byteArr, 63);
+        int state = radio.startTransmit(byteArr, 255);
 
         // we're ready to send more packets,
         // enable interrupt service routine
