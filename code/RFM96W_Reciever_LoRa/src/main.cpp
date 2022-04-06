@@ -43,7 +43,7 @@ void setup() {
 
     // initialize SX1278 with default settings
     Serial.print(F("[RFM96W] Initializing ... "));
-    int state = radio.begin(434.0, 500, 9, 7, RADIOLIB_SX127X_SYNC_WORD_LORAWAN, 17, 8, 0);
+    int state = radio.begin(434.0, 125, 6, 5, RADIOLIB_SX127X_SYNC_WORD_LORAWAN, 17, 8, 0);
     if (state == RADIOLIB_ERR_NONE) {
         Serial.println(F("success!"));
     } else {
