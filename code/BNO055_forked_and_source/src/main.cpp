@@ -35,6 +35,9 @@ Vector<double> trueAccVect;
 /// \b Function \b Prototypes
 // TODO: ADD function prototypes at end
 
+bno055_calib_stat_t calibrate();
+void getInitialOrientation();
+
 
 void updateFilters(Vector<double> gyro, Vector<double> acc){ // TODO: Add any other data points you want filtered
     filteredAccBNO055[0] = filteredAccBNO055X.updateEstimate( static_cast<float>(acc[0]) );
@@ -50,6 +53,10 @@ void updateFilters(Vector<double> gyro, Vector<double> acc){ // TODO: Add any ot
 
 
 bno055_calib_stat_t calibrate(){
+    for (int i=0;i<300;i++) {
+        bno055_burst_t data = sensor.getAllData();
+        delay(10);
+    }
     uint32_t timer = millis();
     int timeout = 20000; // milliseconds
     sensor.setOperationMode(NDOF);
@@ -107,11 +114,13 @@ void calcRotationVect(Vector<double> acc_meas, Vector<double> ori, Vector<double
 }
 
 Vector<double> find_acc_biases() {
+    uint32_t start = 0;
+    uint32_t end = 0;
     /// Should be done on a calibrated sensor
     bool biases_calibrated = false;
     int counter = 0;
 
-    const int num = 255;
+    const int num = 256;
     double acc_biases_x[num] = {0};
     double acc_biases_y[num] = {0};
     double acc_biases_z[num] = {0};
@@ -120,17 +129,25 @@ Vector<double> find_acc_biases() {
     for (auto x : {ACC_OFFSET_X_LSB, ACC_OFFSET_X_MSB, ACC_OFFSET_Y_LSB, ACC_OFFSET_Y_MSB, ACC_OFFSET_Z_LSB, ACC_OFFSET_Z_MSB}) {
         sensor.writeRegister(x, 0x00);
     }
-    sensor.setOperationMode(NDOF); // NDOF mode for reading
+    //sensor.setOperationMode(NDOF); // NDOF mode getting orientation
 
     double avg_x = 0, avg_y = 0, avg_z = 0;
+    getInitialOrientation();
 
+    ori[0] = 360-ori[0];   ori[1] = -ori[1];
+
+    sensor.setOperationMode(AMG); // Setting to AMG mode for getting acceleration, because I fear acceleration values are different in fusion mode???
     // ACC calibration
     while (!biases_calibrated) {
-        Vector<double> acc_bias= sensor.getRawAcceleration();
-        Vector<double> orientation = sensor.getEuler();
-        orientation[0] = 360-orientation[0];   orientation[1] = -orientation[1];
+        start = micros();
+        bno055_burst_t data = sensor.getAllData();
+        Vector<double> acc_bias= data.accel;
+        Vector<double> magRaw = data.mag;
+        Vector<double> gyroRaw = data.gyro; // getting all the data to simulate the exact same conditions as the main loop.
+
+
         Vector<double> tav = {0,0,0};
-        calcRotationVect(acc_bias, orientation, tav);
+        calcRotationVect(acc_bias, ori, tav);
 
         acc_biases_x[counter % num] = tav[0];
         acc_biases_y[counter % num] = tav[1];
@@ -138,7 +155,7 @@ Vector<double> find_acc_biases() {
         bool within_range_x = true;
         bool within_range_y = true;
         bool within_range_z = true;
-        if (counter > (num)) {
+        if (counter > (2*num)) {
 
             for (auto ax: acc_biases_x) { avg_x += ax; }
             for (auto ay: acc_biases_y) { avg_y += ay; }
@@ -167,10 +184,12 @@ Vector<double> find_acc_biases() {
 
         if (Serial) {
             for (int i=0;i<3;i++) { Serial.printf("%lf,     ", tav[i]); }
-            for (int i=0;i<3;i++) { Serial.printf("%lf,     ", orientation[i]); }
+            for (int i=0;i<3;i++) { Serial.printf("%lf,     ", ori[i]); }
             Serial.printf("%lf, %lf, %lf       %d, %d, %d, %d    \n", avg_x, avg_y, avg_z, (counter > num), within_range_x, within_range_y, within_range_z);
         }
-        delay(10);
+        end = micros();
+        delayMicroseconds( ((end-start) < 10000 ) ? (10000- (end - start) ) : 0 );
+
 
     }
     Vector <double> biases = {avg_x, avg_y, avg_z};
@@ -182,7 +201,7 @@ Vector<double> find_gyr_biases() {
     bool biases_calibrated = false;
     int counter = 0;
 
-    const int num = 255;
+    const int num = 512;
     double gyr_biases_x[num] = {0};
     double gyr_biases_y[num] = {0};
     double gyr_biases_z[num] = {0};
@@ -283,7 +302,7 @@ void remove_biases(Vector<double> acc_biases, Vector<double> gyrOffsets){
 
 void getInitialOrientation() {
     sensor.setOperationMode(NDOF);
-    for (int i=0; i<20;i++) {
+    for (int i=0; i<40;i++) {
         ori = sensor.getEuler(); // seems to need a few tries before it works properly ???
         delay(10);
     }
@@ -308,15 +327,39 @@ void BNO055Setup() {
     //sensor.writeRegister(BNO055_AXIS_MAP_CONFIG, 0x24); // TODO: Check that this will be correct for our pcb (Axis remap);
     sensor.writeRegister(BNO055_AXIS_MAP_SIGN, 0b00000000);
 
-    calibrate();
-    acc_biases = find_acc_biases();
-    gyr_biases = find_gyr_biases();
+    //calibrate();
+    //acc_biases = find_acc_biases();
+    //gyr_biases = find_gyr_biases();
 
-    getInitialOrientation();
-    sensor.setOperationMode(AMG);
+    //getInitialOrientation();
+
+    sensor.setOperationMode(NDOF);
 
 }
 
+void deadReckoning(Vector<double> acc, Vector<double> omega, int updateTimeUs, double prevValues[9]) {
+    /// omega (angular velocity) is pulled directly from a filtered gyro estimate.
+    /// acc is the acceleration pulled straight from the accelerometers, conversion is done internally.
+    for (int i=0;i<3;i++) {
+        /// Integration of angular velocity, to get orientationFirst order hold (trapezium rule)
+        /// If the filtered gyro value is within the range of +- 0.02 (due to noise) it is deemed insignificant
+        ori[i] += (updateTimeUs * 0.000001) * 0.5 * (omega[2 - i] + prevValues[8 - i]);
+        prevValues[8-i] = omega[2-i]; // setting previous value of omega for next time.
+    }
+    trueAccVect = {0,0,0};
+    calcRotationVect(acc, ori, trueAccVect);
+    trueAccVect[2] -= 9.81;
+    for(int i=0;i<3;i++) {
+        /// Velocity calculation, First order hold.
+        /// If the value is within the range of +- 0.2 (due to noise) it is deemed insignificant
+        vel[i] += (updateTimeUs*0.000001)*0.5*(trueAccVect[i] + prevValues[i]);
+        prevValues[i] = trueAccVect[i]; // setting previous value of acceleration for next time
+        /// Position calculation, First order hold
+        /// If the value is within the range of +- 0.1 (due to noise) it is deemed insignificant
+        pos[i] += (updateTimeUs*0.000001)*0.5*(vel[i] + prevValues[2+i]);
+        prevValues[2+i] = vel[i]; // setting previous value of velocity for next time.
+    }
+}
 
 void setup() {
     Wire.setClock(1000000);  // i2c seems to work great at 1Mhz
@@ -326,26 +369,6 @@ void setup() {
 
 }
 
-void deadReckoning(Vector<double> acc, Vector<double> omega, int updateTimeUs, double prevValues[9]) {
-    /// omega (angular velocity) is pulled directly from a filtered gyro estimate.
-    /// acc is the acceleration pulled straight from the accelerometers, conversion is done internally.
-    for (int i=0;i<3;i++) {
-        /// Integration of angular velocity, to get orientationFirst order hold (trapezium rule)
-        ori[i] += (updateTimeUs * 0.000001) * 0.5 * (omega[2 - i] + prevValues[8 - i]);
-        prevValues[8-i] = omega[2-i]; // setting previous value of omega for next time.
-    }
-    trueAccVect = {0,0,0};
-    calcRotationVect(acc, ori, trueAccVect);
-    trueAccVect[2] -= 9.81;
-    for(int i=0;i<3;i++) {
-        /// Velocity calculation, First order hold.
-        vel[i] += (updateTimeUs*0.000001)*0.5*(trueAccVect[i] + prevValues[i]);
-        prevValues[i] = trueAccVect[i]; // setting previous value of acceleration for next time
-        /// Position calculation, First order hold
-        pos[i] += (updateTimeUs*0.000001)*0.5*(vel[i] + prevValues[2+i]);
-        prevValues[2+i] = vel[i]; // setting previous value of velocity for next time.
-    }
-}
 
 
 
@@ -370,14 +393,15 @@ void loop() {
     /// Calculations
     deadReckoning(filteredAccBNO055, filteredGyro, 10000, prevVect);
 
-    //TAV: %lf,  %lf,  %lf   ACC: %lf,  %lf,  %lf,   POS: %lf,  %lf,  %lf
-    Serial.printf("ORI: %lf,  %lf, %lf\n",
-
-                  ori[0], ori[1], ori[2]);
-
+//    Serial.printf("TAV: %lf, %lf, %lf  |  VEL: %lf, %lf, %lf  |  POS: %lf, %lf, %lf  |  ORI: %lf, %lf, %lf\n",
+//                  trueAccVect[0], trueAccVect[1], trueAccVect[2],
+//                  vel[0], vel[1], vel[2],
+//                  pos[0], pos[1], pos[2],
+//                  ori[0], ori[1], ori[2]);
+    //Serial.printf("GYRO: %lf, %lf, %lf\n", filteredGyro[0], filteredGyro[1], filteredGyro[2]);
 
 
     uint32_t endOfLoop = micros();
-
+    Serial.println(endOfLoop - startOfLoop);
     delayMicroseconds( ((endOfLoop-startOfLoop) < 10000 ) ? (10000- (endOfLoop - startOfLoop) ) : 0 );
 }
