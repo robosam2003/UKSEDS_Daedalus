@@ -1,42 +1,53 @@
+/// \b INCLUDES
 #include <Arduino.h>
 #include "BNO055.h"
 #include "i2c_driver_wire.h"
 #include "SimpleKalmanFilter.h"
 
+
+/// \b GLOBAL \b VARIABLES
 const byte BNO055_I2C_ADDRESS = 0x28;
 BNO055 sensor(BNO055_I2C_ADDRESS, &Wire);
 
-Vector<double> acc_offsets; // offsets / biases for the accelerometers and gyros
-Vector<double> gyr_offsets;
+Vector<double> acc_biases; // biases / biases for the accelerometers and gyros
+Vector<double> gyr_biases;
 
 /// Holds previous values of (true acceleration), velocity and omega (from gyro)
 double prevVect[9] = {0,0,0, // Needed for the First order hold.
                       0,0,0,
                       0,0,0};
-Vector<double> pos = {}; // For dead reckoning purposes.
-Vector<double> vel = {};
-Vector<double> ori = {};
+Vector<double> pos = {0}; // For dead reckoning purposes.
+Vector<double> vel = {0};
+Vector<double> ori = {0};
 
-SimpleKalmanFilter filteredAccX = SimpleKalmanFilter(0.05, 0.05, 0.01);
-SimpleKalmanFilter filteredAccY = SimpleKalmanFilter(0.05, 0.05, 0.01);
-SimpleKalmanFilter filteredAccZ = SimpleKalmanFilter(0.05, 0.05, 0.01);
+SimpleKalmanFilter filteredAccBNO055X = SimpleKalmanFilter(0.05, 0.05, 0.01);
+SimpleKalmanFilter filteredAccBNO055Y = SimpleKalmanFilter(0.05, 0.05, 0.01);
+SimpleKalmanFilter filteredAccBNO055Z = SimpleKalmanFilter(0.05, 0.05, 0.01);
 
 SimpleKalmanFilter filteredGyroX = SimpleKalmanFilter(0.05, 0.05, 0.01);
 SimpleKalmanFilter filteredGyroY = SimpleKalmanFilter(0.05, 0.05, 0.01);
 SimpleKalmanFilter filteredGyroZ = SimpleKalmanFilter(0.05, 0.05, 0.01);
 
-Vector<double> filteredAcc;
+Vector<double> filteredAccBNO055;
 Vector<double> filteredGyro;
+Vector<double> trueAccVect;
+
+/// \b Function \b Prototypes
+// TODO: ADD function prototypes at end
 
 
 void updateFilters(Vector<double> gyro, Vector<double> acc){ // TODO: Add any other data points you want filtered
-    filteredAcc[0] = filteredAccX.updateEstimate(acc[0]);
-    filteredAcc[1] = filteredAccY.updateEstimate(acc[1]);
-    filteredAcc[2] = filteredAccZ.updateEstimate(acc[2]);
-    filteredGyro[0] = filteredGyroX.updateEstimate(gyro[0]);
-    filteredGyro[1] = filteredGyroY.updateEstimate(gyro[1]);
-    filteredGyro[2] = filteredGyroZ.updateEstimate(gyro[2]);
+    filteredAccBNO055[0] = filteredAccBNO055X.updateEstimate( static_cast<float>(acc[0]) );
+    filteredAccBNO055[1] = filteredAccBNO055Y.updateEstimate( static_cast<float>(acc[1]) );
+    filteredAccBNO055[2] = filteredAccBNO055Z.updateEstimate( static_cast<float>(acc[2]) );
+
+    filteredGyro[0] = filteredGyroX.updateEstimate( static_cast<float>(gyro[0]) );
+    filteredGyro[1] = filteredGyroY.updateEstimate( static_cast<float>(gyro[1]) );
+    filteredGyro[2] = filteredGyroZ.updateEstimate( static_cast<float>(gyro[2]) );
+
+
 }
+
 
 bno055_calib_stat_t calibrate(){
     uint32_t timer = millis();
@@ -59,11 +70,10 @@ double magnitude(Vector<double> vect){
 
 void calcRotationVect(Vector<double> acc_meas, Vector<double> ori, Vector<double>& returnVect) { // returnVect needs to be passes by reference
     /// calculates the absolute acceleration (relative to north and flat) based on acceleration data and orientation data
-
     double degToRad = (2*pi)/360; // the ori returns data in degrees.
-    double heading = ori[0]*degToRad; // in radians
-    double pitch = ori[1]*degToRad; // in radians
-    double roll = ori[2]*degToRad; // in radians
+    double heading = ori[0] * degToRad; // in radians
+    double pitch = ori[1] * degToRad; // in radians
+    double roll = ori[2] * degToRad; // in radians
 
     double rotMatX[3][3] = { {1, 0,          0         },
                              {0, cos(roll),  -sin(roll) },
@@ -96,39 +106,39 @@ void calcRotationVect(Vector<double> acc_meas, Vector<double> ori, Vector<double
 
 }
 
-Vector<double> find_acc_offsets() {
+Vector<double> find_acc_biases() {
     /// Should be done on a calibrated sensor
-    bool offsets_calibrated = false;
+    bool biases_calibrated = false;
     int counter = 0;
 
-    const int num = 127;
+    const int num = 255;
     double acc_biases_x[num] = {0};
     double acc_biases_y[num] = {0};
     double acc_biases_z[num] = {0};
 
-    sensor.setOperationMode(CONFIGMODE);  // set sensor to config mode to reset offsets - // TODO: IS THIS NECESSARY???
+    sensor.setOperationMode(CONFIGMODE);  // set sensor to config mode to reset biases
     for (auto x : {ACC_OFFSET_X_LSB, ACC_OFFSET_X_MSB, ACC_OFFSET_Y_LSB, ACC_OFFSET_Y_MSB, ACC_OFFSET_Z_LSB, ACC_OFFSET_Z_MSB}) {
-        sensor.writeRegister(x, 0);
+        sensor.writeRegister(x, 0x00);
     }
     sensor.setOperationMode(NDOF); // NDOF mode for reading
 
     double avg_x = 0, avg_y = 0, avg_z = 0;
 
     // ACC calibration
-    while (!offsets_calibrated) {
-        Vector<double> acc_offset = sensor.getRawAcceleration();
-        Vector<double> ori = sensor.getEuler();
-        ori[0] = 360-ori[0];   ori[1] = -ori[1];
-        Vector<double> trueAccVect = {0,0,0};
-        calcRotationVect(acc_offset, ori, trueAccVect);
+    while (!biases_calibrated) {
+        Vector<double> acc_bias= sensor.getRawAcceleration();
+        Vector<double> orientation = sensor.getEuler();
+        orientation[0] = 360-orientation[0];   orientation[1] = -orientation[1];
+        Vector<double> tav = {0,0,0};
+        calcRotationVect(acc_bias, orientation, tav);
 
-        acc_biases_x[counter % num] = trueAccVect[0];
-        acc_biases_y[counter % num] = trueAccVect[1];
-        acc_biases_z[counter % num] = trueAccVect[2];
+        acc_biases_x[counter % num] = tav[0];
+        acc_biases_y[counter % num] = tav[1];
+        acc_biases_z[counter % num] = tav[2];
         bool within_range_x = true;
         bool within_range_y = true;
         bool within_range_z = true;
-        if (counter > (2 * num)) {
+        if (counter > (num)) {
 
             for (auto ax: acc_biases_x) { avg_x += ax; }
             for (auto ay: acc_biases_y) { avg_y += ay; }
@@ -150,43 +160,43 @@ Vector<double> find_acc_offsets() {
 
                 Serial.println("calculated averages");
                 avg_z -= 9.80; // for if you are using acc data
-                offsets_calibrated = true;
+                biases_calibrated = true;
             }
         }
         counter++;
 
         if (Serial) {
-            for (int i=0;i<3;i++) { Serial.printf("%lf,     ", trueAccVect[i]); }
-            for (int i=0;i<3;i++) { Serial.printf("%lf,     ", ori[i]); }
+            for (int i=0;i<3;i++) { Serial.printf("%lf,     ", tav[i]); }
+            for (int i=0;i<3;i++) { Serial.printf("%lf,     ", orientation[i]); }
             Serial.printf("%lf, %lf, %lf       %d, %d, %d, %d    \n", avg_x, avg_y, avg_z, (counter > num), within_range_x, within_range_y, within_range_z);
         }
         delay(10);
 
     }
-    Vector <double> offsets = {avg_x, avg_y, avg_z};
-    return offsets;
+    Vector <double> biases = {avg_x, avg_y, avg_z};
+    return biases;
 }
 
-Vector<double> find_gyr_offsets() {
+Vector<double> find_gyr_biases() {
     /// Should be done on a calibrated sensor
-    bool offsets_calibrated = false;
+    bool biases_calibrated = false;
     int counter = 0;
 
-    const int num = 512;
+    const int num = 255;
     double gyr_biases_x[num] = {0};
     double gyr_biases_y[num] = {0};
     double gyr_biases_z[num] = {0};
 
-    sensor.setOperationMode(CONFIGMODE);  // set sensor to config mode to reset offsets - // TODO: IS THIS NECESSARY???
+    sensor.setOperationMode(CONFIGMODE);  // set sensor to config mode to reset biases
     for (auto x : {GYR_OFFSET_X_LSB, GYR_OFFSET_X_MSB, GYR_OFFSET_Y_LSB, GYR_OFFSET_Y_MSB, GYR_OFFSET_Z_LSB, GYR_OFFSET_Z_MSB}) {
         sensor.writeRegister(x, 0);
     }
-    sensor.setOperationMode(AMG); // NDOF mode for reading
+    sensor.setOperationMode(AMG); // AMG mode for reading
 
     double avg_x = 0, avg_y = 0, avg_z = 0;
 
-    // ACC calibration
-    while (!offsets_calibrated) {
+    // GYR calibration
+    while (!biases_calibrated) {
         Vector<double> gyrVect = sensor.getRawGyro();
         updateFilters(gyrVect, {0,0,0});
         gyr_biases_x[counter % num] = filteredGyro[0];
@@ -209,7 +219,7 @@ Vector<double> find_gyr_offsets() {
             for (auto c: gyr_biases_z) { if (abs((c - avg_z) > thres)) { within_range_z = false; }}
             if ((within_range_x & within_range_y) & within_range_z) {
                 Serial.println("calculated averages");
-                offsets_calibrated = true;
+                biases_calibrated = true;
             }
         }
         counter++;
@@ -222,16 +232,16 @@ Vector<double> find_gyr_offsets() {
         delay(10);
 
     }
-    Vector <double> offsets = {avg_x, avg_y, avg_z};
-    return offsets;
+    Vector <double> biases = {avg_x, avg_y, avg_z};
+    return biases;
 }
 
-void remove_offsets(Vector<double> acc_offsets, Vector<double> gyrOffsets){
+void remove_biases(Vector<double> acc_biases, Vector<double> gyrOffsets){
 
     signed short addresses[3][9] = {{ACC_OFFSET_X_LSB, ACC_OFFSET_X_MSB,
                                      ACC_OFFSET_Y_LSB, ACC_OFFSET_Y_MSB,
                                      ACC_OFFSET_Z_LSB, ACC_OFFSET_Z_MSB,
-                                     static_cast<short>(acc_offsets[0]*100), static_cast<short>(acc_offsets[1]*100), static_cast<short>(acc_offsets[2]*100) },
+                                     static_cast<short>(acc_biases[0]*100), static_cast<short>(acc_biases[1]*100), static_cast<short>(acc_biases[2]*100) },
                                     {MAG_OFFSET_X_LSB, MAG_OFFSET_X_MSB,
                                      MAG_OFFSET_Y_LSB, MAG_OFFSET_Y_MSB,
                                      MAG_OFFSET_Z_LSB, MAG_OFFSET_Z_MSB,
@@ -271,17 +281,23 @@ void remove_offsets(Vector<double> acc_offsets, Vector<double> gyrOffsets){
     }
 }
 
+void getInitialOrientation() {
+    sensor.setOperationMode(NDOF);
+    for (int i=0; i<20;i++) {
+        ori = sensor.getEuler(); // seems to need a few tries before it works properly ???
+        delay(10);
+    }
+    ori = sensor.getEuler(); // gives data in degrees
+    Serial.printf("INITIAL ORIENTATION: %lf, %lf, %lf\n", ori[0], ori[1], ori[2]);
+    delay(2000);
+
+}
+
 void BNO055Setup() {
     sensor.begin();
     sensor.setPowerMode(NORMAL);
     sensor.setOperationMode(CONFIGMODE); // registers must be configured in config mode
 
-    //calibrate();
-    //
-    acc_offsets = find_acc_offsets();
-    gyr_offsets = find_gyr_offsets();
-    //remove_offsets(acc_offsets, gyr_offsets);
-    sensor.setOperationMode(AMG);
 
     sensor.writeRegister(BNO055_UNIT_SEL, 0b00000000); // Celsius, degrees, dps, m/s^2
     sensor.setAccelerometerConfig(0b00011011); //Normal mode, 500Hz, 16G
@@ -292,7 +308,15 @@ void BNO055Setup() {
     //sensor.writeRegister(BNO055_AXIS_MAP_CONFIG, 0x24); // TODO: Check that this will be correct for our pcb (Axis remap);
     sensor.writeRegister(BNO055_AXIS_MAP_SIGN, 0b00000000);
 
+    calibrate();
+    acc_biases = find_acc_biases();
+    gyr_biases = find_gyr_biases();
+
+    getInitialOrientation();
+    sensor.setOperationMode(AMG);
+
 }
+
 
 void setup() {
     Wire.setClock(1000000);  // i2c seems to work great at 1Mhz
@@ -302,26 +326,23 @@ void setup() {
 
 }
 
-void deadReckoning(Vector<double> acc, Vector<double> omega, int updateTimeUs, double prevValues[9],
-                   Vector<double> &pos, Vector<double> &vel, Vector<double> &ori ) {
+void deadReckoning(Vector<double> acc, Vector<double> omega, int updateTimeUs, double prevValues[9]) {
     /// omega (angular velocity) is pulled directly from a filtered gyro estimate.
     /// acc is the acceleration pulled straight from the accelerometers, conversion is done internally.
     for (int i=0;i<3;i++) {
-        /// Integration of angular velocity, First order hold (trapezium rule)
+        /// Integration of angular velocity, to get orientationFirst order hold (trapezium rule)
         ori[i] += (updateTimeUs * 0.000001) * 0.5 * (omega[2 - i] + prevValues[8 - i]);
         prevValues[8-i] = omega[2-i]; // setting previous value of omega for next time.
     }
-    Vector<double> trueAccVect = {};
+    trueAccVect = {0,0,0};
     calcRotationVect(acc, ori, trueAccVect);
     trueAccVect[2] -= 9.81;
-    // TODO: reference frame conversion before this step. and also minus gravity,
     for(int i=0;i<3;i++) {
         /// Velocity calculation, First order hold.
-        vel[i] += (updateTimeUs*0.000001)*0.5*(trueAccVect[i] + prevValues[i]) ;
+        vel[i] += (updateTimeUs*0.000001)*0.5*(trueAccVect[i] + prevValues[i]);
         prevValues[i] = trueAccVect[i]; // setting previous value of acceleration for next time
         /// Position calculation, First order hold
         pos[i] += (updateTimeUs*0.000001)*0.5*(vel[i] + prevValues[2+i]);
-
         prevValues[2+i] = vel[i]; // setting previous value of velocity for next time.
     }
 }
@@ -330,33 +351,33 @@ void deadReckoning(Vector<double> acc, Vector<double> omega, int updateTimeUs, d
 
 void loop() {
     uint32_t startOfLoop = micros();
+
     /// Data Aquisition
     bno055_burst_t data = sensor.getAllData();
-    Vector<double> BNO055acc = data.accel;
-    Vector<double> mag = data.mag;
-    Vector<double> gyro = data.gyro;
+    Vector<double> BNO055accRaw = data.accel;
+    Vector<double> magRaw = data.mag;
+    Vector<double> gyroRaw = data.gyro;
 
-    /// removing offsets, for internal gyroscope integration. Higher precision of calculation this way.
-    for(int i=0;i<3;i++) { BNO055acc[i] += acc_offsets[0]; gyro[i] -= gyr_offsets[i]; }
+    /// Removing biases for internal integration of gyroscopes and accelerometers. \n Results in higher precision of calculation than setting bias/offset registers
+    for(int i=0;i<3;i++) { BNO055accRaw[i] -= acc_biases[i]; gyroRaw[i] -= gyr_biases[i]; }
 
-    //eul[0] = 360-eul[0];   eul[1] = -eul[1];  // necessary to have all the angles going anticlockise-> increasing. - for the reference frame conversion.
-
-/// --------------------------------------------------------------------------------------
+    //eul[0] = 360-eul[0];   eul[1] = -eul[1];  // necessary to have all the angles going anticlockise-> increasing. - for the reference frame conversion in fusion mode
 
 /// Kalman filtering
-
-    updateFilters(gyro, BNO055acc);
+    updateFilters(gyroRaw, BNO055accRaw);
 
 
     /// Calculations
-    deadReckoning(filteredAcc, filteredGyro, 10000, prevVect, pos, vel, ori);
+    deadReckoning(filteredAccBNO055, filteredGyro, 10000, prevVect);
 
+    //TAV: %lf,  %lf,  %lf   ACC: %lf,  %lf,  %lf,   POS: %lf,  %lf,  %lf
+    Serial.printf("ORI: %lf,  %lf, %lf\n",
 
-    Serial.printf("ACC: %lf,  %lf,  %lf   VEL: %lf,  %lf,  %lf,   POS: %lf,  %lf,  %lf\n", BNO055acc[0], BNO055acc[1], BNO055acc[2], vel[0], vel[1], vel[2], pos[0], pos[1], pos[2]);
+                  ori[0], ori[1], ori[2]);
 
 
 
     uint32_t endOfLoop = micros();
 
-    delayMicroseconds(((endOfLoop-startOfLoop) < 10000 ) ? (10000- (endOfLoop - startOfLoop) ) : 0);
+    delayMicroseconds( ((endOfLoop-startOfLoop) < 10000 ) ? (10000- (endOfLoop - startOfLoop) ) : 0 );
 }
