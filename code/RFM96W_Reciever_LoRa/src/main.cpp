@@ -34,16 +34,17 @@
 // DIO1 pin:  3
 RFM96 radio = new Module(10, 2, 9, 3);
 void setFlag();
+int state;
 // or using RadioShield
 // https://github.com/jgromes/RadioShield
 //SX1278 radio = RadioShield.ModuleA;
 
 void setup() {
-    Serial.begin(9600);
+    Serial.begin(500000);
 
     // initialize SX1278 with default settings
     Serial.print(F("[RFM96W] Initializing ... "));
-    int state = radio.begin(434.0, 500, 9, 7, RADIOLIB_SX127X_SYNC_WORD_LORAWAN, 17, 8, 0);
+    int state = radio.begin(434.0, 500, 8, 7, RADIOLIB_SX127X_SYNC_WORD_LORAWAN, 17, 8, 0);
     if (state == RADIOLIB_ERR_NONE) {
         Serial.println(F("success!"));
     } else {
@@ -101,6 +102,8 @@ void setFlag() {
     receivedFlag = true;
 }
 
+
+byte byteArr[255];
 void loop() {
     // check if the flag is set
     if(receivedFlag) {
@@ -115,40 +118,37 @@ void loop() {
         //String str;
         //int state = radio.readData(str);
 
-        // you can also read received data as byte array
+        // you can also read received data a    s byte array
 
-        byte byteArr[255];
-        unsigned long a = micros();
-        int state = radio.readData(byteArr, 255);
-        unsigned long b = micros();
-        Serial.print("Reading takes (us) :   ");
-        Serial.println(b-a);
+
+        state = radio.readData(byteArr, 255);
+
 
 
         if (state == RADIOLIB_ERR_NONE) {
             // packet was successfully received
-            Serial.println(F("[RFM96W] Received packet!"));
+            //Serial.println(F("[RFM96W] Received packet!"));
 
             // print data of the packet
-            Serial.print(F("[RFM96W] Data:\t\t\n"));
+            //Serial.print(F("[RFM96W] Data:\t\t\n"));
             //for (auto x : byteArr) { Serial.print(x); Serial.print(", ");}
             Serial.println();
-            Serial.println(byteArr[254]);
+            Serial.println(byteArr[0]);
 
             // print RSSI (Received Signal Strength Indicator)
-            Serial.print(F("[RFM96W] RSSI:\t\t"));
-            Serial.print(radio.getRSSI());
-            Serial.println(F(" dBm"));
+            //Serial.print(F("[RFM96W] RSSI:\t\t"));
+            //Serial.print(radio.getRSSI());
+            //Serial.println(F(" dBm"));
 
             // print SNR (Signal-to-Noise Ratio)
-            Serial.print(F("[RFM96W] SNR:\t\t"));
-            Serial.print(radio.getSNR());
-            Serial.println(F(" dB"));
+            //Serial.print(F("[RFM96W] SNR:\t\t"));
+            //Serial.print(radio.getSNR());
+            //Serial.println(F(" dB"));
 
             // print frequency error
-            Serial.print(F("[RFM96W] Frequency error:\t"));
-            Serial.print(radio.getFrequencyError());
-            Serial.println(F(" Hz"));
+            //Serial.print(F("[RFM96W] Frequency error:\t"));
+            //Serial.print(radio.getFrequencyError());
+            //Serial.println(F(" Hz"));
 
         } else if (state == RADIOLIB_ERR_CRC_MISMATCH) {
             // packet was received, but is malformed
@@ -162,7 +162,7 @@ void loop() {
         }
 
         // put module back to listen mode
-        radio.startReceive();
+        state = radio.startReceive();
 
         // we're ready to receive more packets,
         // enable interrupt service routine

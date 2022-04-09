@@ -24,12 +24,12 @@ void setup() {
 
     // initialize SX1278 with default settings
     Serial.print(F("[SX1278] Initializing ... "));
-    int state = radio.begin(434.0, 500, 9, 7, RADIOLIB_SX127X_SYNC_WORD_LORAWAN, 17, 8, 0);
+    int state = radio.begin(434.0, 500, 8, 7, RADIOLIB_SX127X_SYNC_WORD_LORAWAN, 17, 8, 0);
     if (state == RADIOLIB_ERR_NONE) {
-        Serial.println(F("success!"));
+        if (Serial) { Serial.println(F("success!"));}
     } else {
-        Serial.print(F("failed, code "));
-        Serial.println(state);
+        if (Serial) { Serial.print(F("failed, code "));}
+        if (Serial) { Serial.println(state);}
         while (true);
     }
 
@@ -38,18 +38,12 @@ void setup() {
     radio.setDio0Action(setFlag);
 
     // start transmitting the first packet
-    Serial.print(F("[RFM96W] Sending first packet ... "));
+    if (Serial) { Serial.print(F("[RFM96W] Sending first packet ... ")); }
 
     // you can transmit C-string or Arduino string up to
     // 256 characters long
     transmissionState = radio.startTransmit("Hello World!");
 
-    // you can also transmit byte array up to 256 bytes long
-    /*
-      byte byteArr[] = {0x01, 0x23, 0x45, 0x67,
-                        0x89, 0xAB, 0xCD, 0xEF};
-      state = radio.startTransmit(byteArr, 8);
-    */
 }
 
 // flag to indicate that a packet was sent
@@ -74,9 +68,11 @@ void setFlag() {
 }
 
 
-int counter = 0;
-void loop() {
+
+
+void transmitData(byte arr[]) {
     // check if the previous transmission finished
+    while (!transmittedFlag);
     if(transmittedFlag) {
         // disable the interrupt service routine while
         // processing the data
@@ -87,15 +83,15 @@ void loop() {
 
         if (transmissionState == RADIOLIB_ERR_NONE) {
             // packet was successfully sent
-            Serial.println(F("transmission finished!"));
+            if (Serial) { Serial.println(F("transmission finished!"));}
 
             // NOTE: when using interrupt-driven transmit method,
             //       it is not possible to automatically measure
             //       transmission data rate using getDataRate()
 
         } else {
-            Serial.print(F("failed, code "));
-            Serial.println(transmissionState);
+            if (Serial) { Serial.print(F("failed, code "));}
+            if (Serial) { Serial.println(transmissionState);}
 
         }
 
@@ -105,10 +101,9 @@ void loop() {
         //radio.standby()
 
         // wait a second before transmitting again
-        delay(2);
 
         // send another one
-        Serial.print(F("[RFM96W] Sending another packet ... "));
+        if (Serial) { Serial.print(F("[RFM96W] Sending another packet ... "));}
 
         // you can transmit C-string or Arduino string up to
         // 256 characters long
@@ -117,16 +112,24 @@ void loop() {
         // you can also transmit byte array up to 256 bytes long
 
         byte byteArr[255] = {};
-        for (int i=0; i<255; i++) { byteArr[i] = counter; }
+        for (int i=0; i<255; i++) { byteArr[i] = arr[i]; }
 
-        unsigned long a = microTimer;
-        int state = radio.startTransmit(byteArr, 255); //
-        unsigned long b = microTimer;
-        Serial.printf("Transmission took (us):  %d\t", b-a);
+
+        int state = radio.startTransmit(byteArr, 255);
 
         // we're ready to send more packets,
         // enable interrupt service routine
         enableInterrupt = true;
-        counter++;
     }
+}
+
+int counter = 0;
+byte arr[255] = {};
+void loop() {
+    for (int i=0;i<255;i++) { arr[i] = counter; }
+    unsigned long a = micros();
+    transmitData(arr);
+    unsigned long b = micros();
+    if (Serial) {Serial.printf("Transmission (LoRa) took %d (us)\n", b-a);}
+    counter++;
 }

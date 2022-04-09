@@ -21,10 +21,11 @@
    https://jgromes.github.io/RadioLib/
 */
 
+
 // include the library
 #include <Arduino.h>
 #include <RadioLib.h>
-
+/// FSK
 
 
 // SX1278 has the following connections:
@@ -39,7 +40,7 @@ void setFlag();
 //SX1278 radio = RadioShield.ModuleA;
 
 void setup() {
-    Serial.begin(115200);
+    Serial.begin(500000);
 
     // initialize SX1278 with default settings
     Serial.print(F("[RFM96W] Initializing ... "));
@@ -115,18 +116,16 @@ void loop() {
         receivedFlag = false;
 
         // you can read received data as an Arduino String
-        //String str;
-        //int state = radio.readData(str);
+//        String str;
+//        int state = radio.readData(str);
 
         // you can also read received data as byte array
 
-        byte byteArr[255];
-        unsigned long a = micros();
-        int state = radio.readData(byteArr, 255);
-        unsigned long b = micros();
-        //Serial.print("Reading takes (us) :   ");
-        //Serial.println(b-a);
+        byte byteArr[63];
+        int state = radio.readData(byteArr, 63);
 
+        char str[1024] = "";
+        for (int i=0;i<63;i++) { str[2*i] = (byteArr[i]); str[(2*i) + 1] = ','; }
 
         if (state == RADIOLIB_ERR_NONE) {
             // packet was successfully received
@@ -136,22 +135,29 @@ void loop() {
             //Serial.print(F("[RFM96W] Data:\t\t\n"));
             //for (auto x : byteArr) { Serial.print(x); Serial.print(", ");}
             Serial.println();
-            Serial.println(byteArr[0]);
+            long a = micros();
 
-            // print RSSI (Received Signal Strength Indicator)
-            //Serial.print(F("[RFM96W] RSSI:\t\t"));
-            //Serial.print(radio.getRSSI());
-            //Serial.println(F(" dBm"));
+            Serial.println(str);
+            long b = micros();
 
-            // print SNR (Signal-to-Noise Ratio)
-            //Serial.print(F("[RFM96W] SNR:\t\t"));
-            //Serial.print(radio.getSNR());
-            //Serial.println(F(" dB"));
+            Serial.print("Serial transmission took ");
+            Serial.println(b-a);
 
-            // print frequency error
-            //Serial.print(F("[RFM96W] Frequency error:\t"));
-            //Serial.print(radio.getFrequencyError());
-            //Serial.println(F(" Hz"));
+
+//             print RSSI (Received Signal Strength Indicator)
+            Serial.print(F("[RFM96W] RSSI:\t\t"));
+            Serial.print(radio.getRSSI());
+            Serial.println(F(" dBm"));
+
+//             print SNR (Signal-to-Noise Ratio)
+            Serial.print(F("[RFM96W] SNR:\t\t"));
+            Serial.print(radio.getSNR());
+            Serial.println(F(" dB"));
+
+//             print frequency error
+            Serial.print(F("[RFM96W] Frequency error:\t"));
+            Serial.print(radio.getFrequencyError());
+            Serial.println(F(" Hz"));
 
         } else if (state == RADIOLIB_ERR_CRC_MISMATCH) {
             // packet was received, but is malformed
