@@ -13,13 +13,13 @@ Vector<double> acc_biases = {0,0,0}; // biases for the accelerometers and gyros
 Vector<double> gyr_biases = {0,0,0};
 
 
-const int numDR = 49;
+const int numDR = 50; // number of data points to average
 double prevVect[numDR][9] = {}; /// Holds previous values of (true acceleration), velocity and omega (from gyro)
 
 Vector<double> omegaAverage = {0,0,0}; // live bias calculations
 Vector<double> accAverage = {0,0,0};
-double biasAverageOmegaThreshold = 0;
-double biasAverageAccThreshold = 0;
+double biasAverageOmegaThreshold = 0.5;
+double biasAverageAccThreshold = 0.5;
 
 Vector<double> pos = {0}; // For dead reckoning purposes.
 Vector<double> vel = {0};
@@ -86,9 +86,17 @@ double magnitude(Vector<double> vect){
 void calcRotationVect(Vector<double> acc_meas, Vector<double> ori, Vector<double>& returnVect) { // returnVect needs to be passes by reference
     /// calculates the absolute acceleration (relative to north and flat) based on acceleration data and orientation data
     double degToRad = (2*pi)/360; // the ori returns data in degrees.
-    double heading = ori[0] * degToRad; // in radians
-    double pitch = ori[1] * degToRad; // in radians
-    double roll = ori[2] * degToRad; // in radians
+    double heading, pitch, roll;
+    if (sensor.getOperationMode() == AMG) {
+        heading = ori[2] * degToRad; // in radians
+        pitch = ori[1] * degToRad; // in radians
+        roll = ori[0] * degToRad; // in radians
+    }
+    else {
+        heading = ori[0] * degToRad; // in radians
+        pitch = ori[1] * degToRad; // in radians
+        roll = ori[2] * degToRad; // in radians
+    }
 
     double rotMatX[3][3] = { {1, 0,          0         },
                              {0, cos(roll),  -sin(roll) },
@@ -333,8 +341,8 @@ void deadReckoning(Vector<double> acc, Vector<double> omega, int updateTimeUs, d
     for (int i=0;i<3;i++) {
         /// Integration of angular velocity, to get orientationFirst order hold (trapezium rule)\n
         /// If the filtered gyro value is within the range of +- 0.5 dps (due to noise) it is deemed insignificant
-        (abs(omega[2-i]) > 0.5) ? ori[i] += (updateTimeUs * 0.000001) * 0.5 * (omega[2 - i] + prevValues[DRcounter % numDR][8 - i]) : ori[i] += 0;
-        prevValues[DRcounter % numDR][8-i] = omega[2-i]; // setting previous value of omega for next time.
+        (abs(omega[i]) > 0) ? ori[i] += (updateTimeUs * 0.000001) * 0.5 * (omega[i] + prevValues[DRcounter % numDR][6 + i]) : ori[i] += 0;
+        prevValues[DRcounter % numDR][6+i] = omega[i]; // setting previous value of omega for next time.
     }
     trueAccVect = {0,0,0};
     calcRotationVect(acc, ori, trueAccVect);
@@ -342,7 +350,7 @@ void deadReckoning(Vector<double> acc, Vector<double> omega, int updateTimeUs, d
     for(int i=0;i<3;i++) {
         /// Velocity calculation, First order hold.\n
         /// If the true acceleration value is within the range of +- 0.1 (due to noise) it is deemed insignificant
-        if (abs(trueAccVect[i]) > 0.1) {
+        if (abs(trueAccVect[i]) > 0) {
             vel[i] += (updateTimeUs*0.000001)*0.5*(trueAccVect[i] + prevValues[DRcounter % numDR][i]);
         }
         prevValues[DRcounter % numDR][i] = trueAccVect[i]; // setting previous value of acceleration for next time
@@ -355,35 +363,56 @@ void deadReckoning(Vector<double> acc, Vector<double> omega, int updateTimeUs, d
     }
 
     /// Live Accelerometer and gyroscope bias estimation\n
-
+    //Serial.printf("DEAD RECKONING\n");
     if (DRcounter < numDR) {
         for (int j=0;j<3;j++) {
-            omegaAverage[j] = (omegaAverage[j]*DRcounter + prevValues[DRcounter][8-j]) / (DRcounter+1);
+            omegaAverage[j] = (omegaAverage[j]*DRcounter + prevValues[DRcounter][6+j]) / (DRcounter+1);
             accAverage[j] = (accAverage[j]*DRcounter + prevValues[DRcounter][j]) / (DRcounter + 1);
+            Serial.printf("THE AVERAGE HERE IS: %lf, %lf\n" , omegaAverage[j], accAverage[j]);
         }
+        Serial.printf("THE AVERAGE HERE IS: %lf, %lf\n" , omegaAverage, accAverage);
     }
+
+
     else {
         for (int j=0;j<3;j++) {
-            omegaAverage[j] = (omegaAverage[j]*numDR + prevValues[DRcounter % numDR][8-j]) / (numDR+1);
-            accAverage[j] = (accAverage[j]*DRcounter + prevValues[DRcounter][j]) / (DRcounter + 1);
+            omegaAverage[j] = (omegaAverage[j]*numDR + prevValues[DRcounter % numDR][6+j]) / (numDR + 1);
+            accAverage[j] = (accAverage[j] * numDR + prevValues[DRcounter % numDR][j]) / (numDR + 1);
         }
         bool withinRangeOmega[3] = {true, true, true};
         bool withinRangeAcc[3] = {true, true, true};
 
-        for (int i=0;i<numDR;i++) { // checking if the average values are within a specified range - i.e, the data is all noise, not actual acceleration.
+        for (int i = 0; i<numDR; i++) { // checking if the average values are within a specified range - i.e, the data is all noise, not actual acceleration.
             for (int j = 0; j < 3; j++) {
-                if (abs(prevValues[i][8 - j] - omegaAverage[j]) > biasAverageOmegaThreshold) { withinRangeOmega[j] = false; }
-                if (abs(prevValues[i][8 - j] - accAverage[i]) > biasAverageAccThreshold) { withinRangeAcc[j] = true; }
+                if (abs(prevValues[i][6+j] - omegaAverage[j]) > biasAverageOmegaThreshold) { withinRangeOmega[j] = false; }
+                if (abs(prevValues[i][j] - accAverage[i]) > biasAverageAccThreshold) { withinRangeAcc[j] = false; }
             }
         }
-        if (withinRangeOmega[0] && withinRangeOmega[1] && withinRangeOmega[2]) {
-            for (int i=0;i<3;i++) {
-                gyr_biases[i] += omegaAverage[i];
+
+        Serial.printf("OMEGA av: %lf, %lf, %lf      ACC av:%lf, %lf, %lf\n",
+               omegaAverage[0], omegaAverage[1], omegaAverage[2],
+               accAverage[0], accAverage[1], accAverage[2]);
+
+
+        double gain = 1;
+        for (int i=0;i<3;i++) {
+            if (withinRangeOmega[i]) {
+                Serial.printf("\nFLAG: Changing omega bias %d\n", i);
+                Serial.printf("     offset before was: %lf\n", gyr_biases[i]);
+                gyr_biases[i] = omegaAverage[i] * gain;
+                Serial.printf("     offset after is:   %lf\n", gyr_biases[i]);
+
             }
         }
-        if (withinRangeAcc[0] && withinRangeAcc[1] && withinRangeAcc[2]) {
-            for (int i=0;i<3;i++) {
-                acc_biases[i] += accAverage[i];
+
+
+        for (int i=0;i<3;i++) {
+            if (withinRangeAcc[i]) {
+                Serial.printf("\nFLAG: Changing acc bias %d\n", i);
+                Serial.printf("     offset before was: %lf\n", acc_biases[i]);
+                acc_biases[i] = accAverage[i]*gain;
+                Serial.printf("     offset after is:   %lf\n", acc_biases[i]);
+
             }
         }
 
@@ -432,7 +461,7 @@ void BNO055Setup() {
     //sensor.writeRegister(BNO055_AXIS_MAP_CONFIG, 0x24); // TODO: Check that this will be correct for our pcb (Axis remap);
     sensor.writeRegister(BNO055_AXIS_MAP_SIGN, 0b00000000);
 
-    calibrate();
+    //calibrate();
     //acc_biases = find_acc_biases();
     //gyr_biases = find_gyr_biases();
 
@@ -472,16 +501,18 @@ void loop() {
 
 
     /// Calculations
-    deadReckoning(filteredAccBNO055, filteredGyro, 5000, prevVect);
+    deadReckoning(filteredAccBNO055, filteredGyro, cycleTimeus, prevVect);
+    //deadReckoning(BNO055accRaw, gyroRaw, cycleTimeus, prevVect);
 
 //    Serial.printf("TAV: %lf, %lf, %lf  |  VEL: %lf, %lf, %lf  |  POS: %lf, %lf, %lf  |  ORI: %lf, %lf, %lf\n",
 //                  trueAccVect[0], trueAccVect[1], trueAccVect[2],
 //                  vel[0], vel[1], vel[2],
 //                  pos[0], pos[1], pos[2],
 //                  ori[0], ori[1], ori[2]);
-    Serial.printf("GYRO: %lf, %lf, %lf     ", filteredGyro[0], filteredGyro[1], filteredGyro[2]);
-    Serial.printf("ACC : %lf, %lf, %lf     ", filteredAccBNO055[0], filteredAccBNO055[1], filteredAccBNO055[2]);
-    Serial.printf("POS: %lf, %lf, %lf\n", pos[0], pos[1], pos[2]);
+
+//    Serial.printf("GYRO: %lf, %lf, %lf     ", filteredGyro[0], filteredGyro[1], filteredGyro[2]);
+//    Serial.printf("ACC : %lf, %lf, %lf     ", filteredAccBNO055[0], filteredAccBNO055[1], filteredAccBNO055[2]);
+//    Serial.printf("POS: %lf, %lf, %lf\n", pos[0], pos[1], pos[2]);
 
 
 
