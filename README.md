@@ -1,10 +1,26 @@
-# UKSEDS Team Daedalus
+# UKSEDS Team Daedalus - A G-class rocket made for the UKSEDS Orbex National Rocketry Championship
 
-The code and other files for the team Daedalus rocket.
+# Circuitry
+This rocket used breakout boards to house components. This made testing and verification easier before ordering the final PCB. The PCB was designed in EAGLE using many custom libraries. 
+
+The final schematic:
+
+`Rocketry_circuit.sch`:
+
+<img src = https://github.com/robosam2003/UKSEDS_Daedalus/blob/main/resources/schProduction.png >
 
 
+The final pcb board design:
+
+`Rocketry_circuit.brd`:
+
+<img src = https://github.com/robosam2003/UKSEDS_Daedalus/blob/main/resources/brdProduction.png>
 
 
-Things to check out:
+The manufactured PCB (from china):   
 
-https://static1.squarespace.com/static/549ce89be4b0cddb26c4894b/t/5ce58210e4966b7fc63fbe10/1558544951210/Traveler-IV-Whitepaper
+<img src = https://github.com/robosam2003/UKSEDS_Daedalus/blob/main/resources/nakedBoard1.jpg width = 500> <img src = https://github.com/robosam2003/UKSEDS_Daedalus/blob/main/resources/nakedBoard2.jpg width = 500>
+
+TODO: 
+- Add Final pcb manufacturing images
+- Add Code section when done 
