@@ -1,4 +1,4 @@
-# UKSEDS Team Daedalus - A G-class rocket made for the UKSEDS Orbex National Rocketry Championship
+# UKSEDS Team Daedalus - "In thrust we trust"
 
 # Circuitry
 This rocket used breakout boards to house components. This made testing and verification easier before ordering the final PCB. The PCB was designed in EAGLE using many custom libraries. 
