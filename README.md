@@ -19,7 +19,7 @@ The final pcb board design:
 
 The manufactured PCB (from china):   
 
-<img src = https://github.com/robosam2003/UKSEDS_Daedalus/blob/main/resources/nakedBoard1.jpg width = 500> <img src = https://github.com/robosam2003/UKSEDS_Daedalus/blob/main/resources/nakedBoard2.jpg width = 500>
+<img src = https://github.com/robosam2003/UKSEDS_Daedalus/blob/main/resources/nakedBoard1.jpg width = 400> <img src = https://github.com/robosam2003/UKSEDS_Daedalus/blob/main/resources/nakedBoard2.jpg width = 400>
 
 TODO: 
 - Add Final pcb manufacturing images
