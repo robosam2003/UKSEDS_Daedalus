@@ -26,6 +26,9 @@
 #include <RadioLib.h>
 
 
+#define WRITE 0b10000000
+#define READ 0b00000000
+#define CS 37
 
 // SX1278 has the following connections:
 // NSS pin:   10
@@ -33,7 +36,11 @@
 // RESET pin: 9
 // DIO1 pin:  3
 RFM96 radio = new Module(10, 2, 9, 3);
+
+// prototypes
 void setFlag();
+void SPIREGSET(byte address, byte value);
+int SPIREADREG(byte address, int bytesToRead);
 int state;
 // or using RadioShield
 // https://github.com/jgromes/RadioShield
@@ -44,7 +51,7 @@ void setup() {
 
     // initialize SX1278 with default settings
     Serial.print(F("[RFM96W] Initializing ... "));
-    int state = radio.begin(434.0, 500, 8, 7, RADIOLIB_SX127X_SYNC_WORD_LORAWAN, 17, 8, 0);
+    int state = radio.begin(434.0, 500, 6, 5, RADIOLIB_SX127X_SYNC_WORD_LORAWAN, 17, 8, 0);
     if (state == RADIOLIB_ERR_NONE) {
         Serial.println(F("success!"));
     } else {
@@ -56,6 +63,18 @@ void setup() {
     // set the function that will be called
     // when new packet is received
     radio.setDio0Action(setFlag);
+
+
+    // spreading factor 6
+    radio.setSpreadingFactor(6);
+
+    radio.implicitHeader(255);
+    byte x31Reg = SPIREADREG(0x31, 1);
+    // write to the last 3 bits of register 0x31
+    x31Reg &= 0b11111101;
+    SPIREGSET(0x31, x31Reg);
+
+    SPIREGSET(0x37, 0x0C);
 
     // start listening for LoRa packets
     Serial.print(F("[RFM96W] Starting to listen ... "));
@@ -118,7 +137,7 @@ void loop() {
         //String str;
         //int state = radio.readData(str);
 
-        // you can also read received data a    s byte array
+        // you can also read received data as byte array
 
 
         state = radio.readData(byteArr, 255);
@@ -133,7 +152,7 @@ void loop() {
             //Serial.print(F("[RFM96W] Data:\t\t\n"));
             //for (auto x : byteArr) { Serial.print(x); Serial.print(", ");}
             Serial.println();
-            Serial.println(byteArr[0]);
+            Serial.println(byteArr[50]);
 
             // print RSSI (Received Signal Strength Indicator)
             //Serial.print(F("[RFM96W] RSSI:\t\t"));
@@ -168,5 +187,28 @@ void loop() {
         // enable interrupt service routine
         enableInterrupt = true;
     }
+
+}
+
+int SPIREADREG(byte address, int bytesToRead){  // FIFO
+    address = READ | address; // puts 0 int the 8th bit.
+    byte inByte = 0;
+    int result = 0;
+    digitalWrite(CS, LOW); // begin transfer
+    for (int i=0; i<bytesToRead; i++) {
+        result = result << 8;
+        inByte = SPI.transfer(0x00);  // transfers 0x00 over MOSI line, recieves a byte over MISO line.
+        result = result | inByte;
+    }
+    digitalWrite(CS, HIGH); // end transfer
+    return result;
+}
+
+void SPIREGSET(byte address, byte value) {
+    address = WRITE | address; //
+    digitalWrite(CS, LOW); // pulls CS low, which begins the transfer
+    SPI.transfer(address);
+    SPI.transfer(value);
+    digitalWrite(CS, HIGH); // pulls CS high, which ends the transfer
 
 }

@@ -3,18 +3,23 @@
 #include <Arduino.h>
 #include <RadioLib.h>
 
-
+#define WRITE 0b10000000
+#define READ 0b00000000
+#define CS 37
 elapsedMicros microTimer;
 
 
-// SX1278 has the following connections:
-// NSS pin:   10
+
+// NSS pin:   37
 // DIO0 pin:  2
 // RESET pin: 9
 // DIO1 pin:  3
-RFM96 radio = new Module(10, 2, 9, 3);
+RFM96 radio = new Module(CS, 2, 9, 3);
 
+// prototypes
 void setFlag();
+void SPIREGSET(byte address, byte value);
+int SPIREADREG(byte address, int bytesToRead);
 
 // save transmission state between loops
 int transmissionState = RADIOLIB_ERR_NONE;
@@ -24,7 +29,7 @@ void setup() {
 
     // initialize SX1278 with default settings
     Serial.print(F("[SX1278] Initializing ... "));
-    int state = radio.begin(434.0, 500, 8, 7, RADIOLIB_SX127X_SYNC_WORD_LORAWAN, 17, 8, 0);
+    int state = radio.begin(434.0, 500, 6, 5, RADIOLIB_SX127X_SYNC_WORD_LORAWAN, 17, 8, 0);
     if (state == RADIOLIB_ERR_NONE) {
         if (Serial) { Serial.println(F("success!"));}
     } else {
@@ -32,10 +37,24 @@ void setup() {
         if (Serial) { Serial.println(state);}
         while (true);
     }
+    radio.setDio0Action(setFlag);
+
+    // spreading factor 6
+    radio.setSpreadingFactor(6);
+
+    radio.implicitHeader(255);
+    byte x31Reg = SPIREADREG(0x31, 1);
+    // write to the last 3 bits of register 0x31
+    x31Reg &= 0b11111101;
+    SPIREGSET(0x31, x31Reg);
+
+    SPIREGSET(0x37, 0x0C);
+
+
 
     // set the function that will be called
     // when packet transmission is finished
-    radio.setDio0Action(setFlag);
+
 
     // start transmitting the first packet
     if (Serial) { Serial.print(F("[RFM96W] Sending first packet ... ")); }
@@ -52,17 +71,36 @@ volatile bool transmittedFlag = false;
 // disable interrupt when it's not needed
 volatile bool enableInterrupt = true;
 
-// this function is called when a complete packet
-// is transmitted by the module
-// IMPORTANT: this function MUST be 'void' type
-//            and MUST NOT have any arguments!
+
+
+int SPIREADREG(byte address, int bytesToRead){  // FIFO
+    address = READ | address; // puts 0 int the 8th bit.
+    byte inByte = 0;
+    int result = 0;
+    digitalWrite(CS, LOW); // begin transfer
+    for (int i=0; i<bytesToRead; i++) {
+        result = result << 8;
+        inByte = SPI.transfer(0x00);  // transfers 0x00 over MOSI line, recieves a byte over MISO line.
+        result = result | inByte;
+    }
+    digitalWrite(CS, HIGH); // end transfer
+    return result;
+}
+
+void SPIREGSET(byte address, byte value) {
+    address = WRITE | address; //
+    digitalWrite(CS, LOW); // pulls CS low, which begins the transfer
+    SPI.transfer(address);
+    SPI.transfer(value);
+    digitalWrite(CS, HIGH); // pulls CS high, which ends the transfer
+
+}
 
 void setFlag() {
     // check if the interrupt is enabled
     if(!enableInterrupt) {
         return;
     }
-
     // we sent a packet, set the flag
     transmittedFlag = true;
 }
@@ -130,6 +168,7 @@ void loop() {
     unsigned long a = micros();
     transmitData(arr);
     unsigned long b = micros();
-    if (Serial) {Serial.printf("Transmission (LoRa) took %d (us)\n", b-a);}
+    if (Serial) {Serial.printf("Transmission (LoRa) took %d (us)", b-a);}
+
     counter++;
 }
