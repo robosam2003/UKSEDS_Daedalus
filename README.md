@@ -21,6 +21,11 @@ The manufactured PCB (from china):
 
 <img src = https://github.com/robosam2003/UKSEDS_Daedalus/blob/main/resources/nakedBoard1.jpg width = 400> <img src = https://github.com/robosam2003/UKSEDS_Daedalus/blob/main/resources/nakedBoard2.jpg width = 400>
 
+The assembled pcb with breakouts soldered and mounted:
+
+<img src = https://github.com/robosam2003/UKSEDS_Daedalus/blob/main/resources/finalPcbFront.jpg>
+
+<img src = https://github.com/robosam2003/UKSEDS_Daedalus/blob/main/resources/finalPcbBack.jpg>
+
 TODO: 
-- Add Final pcb manufacturing images
 - Add Code section when done 
