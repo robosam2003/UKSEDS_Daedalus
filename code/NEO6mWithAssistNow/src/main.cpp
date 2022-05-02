@@ -1,5 +1,7 @@
 // Created by Samuel scott (robosam2003) on 30/04/2022
+// This program sets up the neo6m gps and performs assistNow loading.
 /// Datasheet url: https://content.u-blox.com/sites/default/files/products/documents/u-blox6_ReceiverDescrProtSpec_%28GPS.G6-SW-10018%29_Public.pdf#page=118&zoom=100,0,0
+/// Also see: https://content.u-blox.com/sites/default/files/products/documents/MultiGNSS-Assistance_UserGuide_%28UBX-13004360%29.pdf
 /// little endian format /:)
 
 // This program reads the mgaonline.ubx file from the sd card and then writes it to the NEO6M GPS
@@ -8,35 +10,96 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include <SD.h>
-#include <TimeLib.h>
+#include <TimeLib.h> // : https://github.com/PaulStoffregen/Time
 #include "assistNow.h"
+#include <ctime>
 
 
 
 #define transistorPin 32
 #define ubxHeader1 0xB5
 #define ubxHeader2 0x62
+#define gpsBaudRate 9600
 
 
 /// Change this what Serial port the GPS is connected to
 #define gpsSerial Serial2 // Hardware serial port for GPS
 
 
+time_t getTeensyTime() {
+    return Teensy3Clock.get();
+}
+
+void rtcSetup()  {
+    setSyncProvider(getTeensyTime);
+    Serial.begin(9600);
+    delay(100);
+    if (timeStatus()!= timeSet) {
+        Serial.println("Unable to sync with the RTC");
+    } else {
+        Serial.println("RTC has set the system time");
+    }
+    // Usually about 2 seconds difference from compile time to runtime. Set the RTC to + 2 seconds to compensate.
+    setTime(hour()-1, minute(), second() + 2, day(), month(), year()); // we are on bst time rn
+}
+
+time_t TimeFromYMD(int year, int month, int day) {
+    struct tm tm = {0};
+    tm.tm_year = year - 1900;
+    tm.tm_mon = month - 1;
+    tm.tm_mday = day;
+    return mktime(&tm);
+}
+
+unsigned short GPSweek() {
+    double diff = difftime(TimeFromYMD(year(), month(), day()), TimeFromYMD(1980, 1, 1));
+    return (unsigned short) (diff / SECS_PER_WEEK);
+}
+
+unsigned int actualTimeOfWeekms() {
+    return (unsigned int) (1000*((weekday()-1)*SECS_PER_DAY + hour()*SECS_PER_HOUR + minute()*SECS_PER_MIN + second()));
+}
+
+void serialClear() {
+    while (gpsSerial.available()) {
+        gpsSerial.read();
+    }
+}
+
+
 void sendUbx(byte ubxClassID, byte messageID, short payloadLength, const byte payload[]) { // Send a UBX message
+//    gpsSerial.print("$PUBX,40,GLL,0,0,0,0*5C\r\n");
+//    gpsSerial.print("$PUBX,40,ZDA,0,0,0,0*44\r\n");
+//    gpsSerial.print("$PUBX,40,VTG,0,0,0,0*5E\r\n");
+//    gpsSerial.print("$PUBX,40,GSV,0,0,0,0*59\r\n");
+//    gpsSerial.print("$PUBX,40,GSA,0,0,0,0*4E\r\n");
+//    gpsSerial.print("$PUBX,40,RMC,0,0,0,0*47\r\n");
+//    gpsSerial.print("$PUBX,40,GGA,0,0,0,0*5A\r\n"); // DISABLE THEM ALLLL
+    //serialClear();
+
+
     byte buffer[payloadLength + 8];
     buffer[0] = ubxHeader1;
     buffer[1] = ubxHeader2;
     buffer[2] = ubxClassID;
     buffer[3] = messageID;
-    buffer[4] = (payloadLength & 0xFF00) >> 8; // little endian
-    buffer[5] = (payloadLength & 0x00FF);
+    buffer[4] = (payloadLength & 0x00FF); // little endian: lsB first
+    buffer[5] = (payloadLength & 0xFF00) >> 8;
     for (int i = 0; i < payloadLength; i++) {
         buffer[i + 6] = payload[i];
     }
     /// Calculate the checksum
     byte ckBuffer[payloadLength + 4]; // includes ubxClassID, messageID, payloadLength, and payload
-    int n = 0;
-    uint8_t CK_A= 0, CK_B = 0;
+    ckBuffer[0] = ubxClassID;
+    ckBuffer[1] = messageID;
+    ckBuffer[2] = (payloadLength & 0x00FF); // little endian: lsB first
+    ckBuffer[3] = (payloadLength & 0xFF00) >> 8;
+    for (int i = 0; i < payloadLength; i++) {
+        ckBuffer[i + 4] = payload[i];
+    }
+    int n = payloadLength+ 4;
+    uint8_t CK_A= 0;
+    uint8_t CK_B = 0;
     for (int i=0;i<n;i++)
     {
         CK_A = CK_A + ckBuffer[i];
@@ -44,46 +107,93 @@ void sendUbx(byte ubxClassID, byte messageID, short payloadLength, const byte pa
     }
     buffer[payloadLength + 6] = CK_A;
     buffer[payloadLength + 7] = CK_B;
+    Serial.println("\nThis is the buffer:");
+    for (int i=0;i<payloadLength+8;i++) {
+        Serial.printf("%02X ", buffer[i]);
+    }
     /// Send the message
     for (int i = 0; i < payloadLength + 8; i++) {
         gpsSerial.write(buffer[i]);
     }
 
+    gpsSerial.flush();
+
+    char ackOrNack[64] = {0};
+    if (ubxClassID == CFG) {
+        delay(500);
+        //serialClear();
+        if (!gpsSerial.available()) { Serial.printf("The gps serial is not available."); };
+        //while (!gpsSerial.available());
+        int a = gpsSerial.available();
+        Serial.println(gpsSerial.available());
+        gpsSerial.readBytes(ackOrNack, a);
+        for (int i = 0; i < a; i++) {
+            Serial.write(ackOrNack[i]);
+        }
+
+        Serial.clear();
+    }
+
 }
 
+
+
 void getUbx(byte ubxClassID, byte messageID, short payloadLength, byte payload[]) { // Get a UBX message
-    // As a quick aside, this function was generated almost entirely by Github copilot, and I am truly shocked.
+    // As a quick aside, Most of this function was generated almost entirely by Github copilot, and I am truly shocked.
 
     /** The UBX protocol was designed such, that when sending a message with no payload
      (or just a single parameter which identifies the poll request) the
      message is polled.  - Datasheet: 27.2 */
 
+    /// Message structure:
+    /// ubxHeader1, ubxHeader2, ubxClassID, messageID, payloadLength, payload, checksumA, checksumB
     // Send the poll request with empty payload to poll.
-    sendUbx(ubxClassID, messageID, 0, NULL);
+
+    Serial.println(gpsSerial.available());
+    while (gpsSerial.available()) { gpsSerial.read(); }// should clear the buffer
+
+    Serial.println(gpsSerial.available());
+    sendUbx(ubxClassID, messageID, 0, payload);
+    Serial.clear();
+    Serial.println(gpsSerial.available());
+
+    // Wait for the response
+    while (gpsSerial.available() < (payloadLength + 8));
+    Serial.println("bytes available:");
+    Serial.printf("%d\n", gpsSerial.available());
+
+
 
     byte buffer[payloadLength + 8];
-    for (int i=0;i < payloadLength + 8;i++) {
-        buffer[i] = gpsSerial.read();
+    while (gpsSerial.available()) { gpsSerial.readBytes(buffer, payloadLength + 8); }
+
+    Serial.println("BUFFER");
+    for (int i = 0; i < payloadLength+8; i++) {
+        Serial.printf("%02X ", buffer[i]);
     }
     /// Check the header
     if (buffer[0] != ubxHeader1 || buffer[1] != ubxHeader2) {
+        Serial.println("Bad header");
         return;
     }
     /// Check the class ID
     if (buffer[2] != ubxClassID) {
+        Serial.println("Bad class ID");
         return;
     }
     /// Check the message ID
     if (buffer[3] != messageID) {
+        Serial.println("Bad message ID");
         return;
     }
     /// Check the payload length
     if (buffer[4] != (payloadLength & 0xFF00) >> 8 || buffer[5] != (payloadLength & 0x00FF)) {
+        Serial.println("Bad payload length");
         return;
     }
     /// Check the checksum
     byte ckBuffer[payloadLength + 4]; // includes ubxClassID, messageID, payloadLength, and payload
-    int n = 0;
+    int n = payloadLength + 4;
     uint8_t CK_A= 0, CK_B = 0;
     for (int i=0;i<n;i++)
     {
@@ -91,6 +201,7 @@ void getUbx(byte ubxClassID, byte messageID, short payloadLength, byte payload[]
         CK_B = CK_B + CK_A;
     }
     if (buffer[payloadLength + 6] != CK_A || buffer[payloadLength + 7] != CK_B) {
+        printf("Checksum failed\n");
         return;
     }
     /// Copy the payload
@@ -99,29 +210,40 @@ void getUbx(byte ubxClassID, byte messageID, short payloadLength, byte payload[]
     }
 }
 
-void getUbxFromFile(File fptr, byte ubxClassID, byte messageID, short payloadLength, byte payload[]) {
+int getUbxFromFile(File fptr, byte ubxClassID, byte messageID, short payloadLength, byte payload[]) {
+    fptr.seek(0);
     int fileSize = fptr.size();
     for (int i=0;i<fileSize;i++) {
         byte b = fptr.read();
+        // get the current file position
+        int pos = fptr.position();
 
-        // everything below here is generated by Github copilot - amazing!
         if (b == ubxHeader1) {
+            Serial.println("Found header 1");
             if (fptr.read() == ubxHeader2) {
+                Serial.println("Found header 2");
                 if (fptr.read() == ubxClassID) {
+                    Serial.println("Found class ID");
                     if (fptr.read() == messageID) {
-                        if (fptr.read() == (payloadLength & 0xFF00) >> 8) {
-                            if (fptr.read() == (payloadLength & 0x00FF)) {
-                                for (int i = 0; i < payloadLength; i++) {
-                                    payload[i] = fptr.read();
-                                }
-                                return;
+                        Serial.println("Found message ID");
+                        if (fptr.read() == (payloadLength & 0x00FF)) { // little endian
+                            Serial.println("Found payload length LSB");
+                            if (fptr.read() == (payloadLength & 0xFF00) >> 8) {
+                                Serial.println("Found payload length MSB");
+                                fptr.readBytes(reinterpret_cast<char *>(payload), payloadLength);
+
+                                Serial.println("Found payload");
+                                return 1; // 1 for success
                             }
                         }
                     }
                 }
             }
         }
+        // seek back to the current position (if we didn't return)
+        fptr.seek(pos);
     }
+    return 0; // 0 for failure (could not find)
 
 
 }
@@ -132,16 +254,22 @@ void performOnlineAssist() {
      • Send UBX-AID-INI (time, clock and position) message.
      • Send UBX-AID-EPH (ephemeris) message.
      • Apply optional hardware time synchronization pulse within 0.5 s after (or before, depending on the
-     configuration in UBX-AID-INI) sending the UBX-AID-INI message if hardware time synchronization is
-     required. When sending the message before applying the pulse, make sure to allow the GPS receiver to
-     parse and process the aiding message. The time for parsing depends on the baud rate. The processing time
-     is 100 ms maximum.
+       configuration in UBX-AID-INI) sending the UBX-AID-INI message if hardware time synchronization is
+       required. When sending the message before applying the pulse, make sure to allow the GPS receiver to
+       parse and process the aiding message. The time for parsing depends on the baud rate. The processing time
+       is 100 ms maximum.
      • Send optional UBX-AID-HUI (health, UTC and ionosphere parameters) message.
      • Send optional UBX-AID-ALM (almanac) message. **/
+//    gpsSerial.print("$PUBX,40,GLL,0,0,0,0*5C\r\n");
+//    gpsSerial.print("$PUBX,40,ZDA,0,0,0,0*44\r\n");
+//    gpsSerial.print("$PUBX,40,VTG,0,0,0,0*5E\r\n");
+//    gpsSerial.print("$PUBX,40,GSV,0,0,0,0*59\r\n");
+//    gpsSerial.print("$PUBX,40,GSA,0,0,0,0*4E\r\n");
+//    gpsSerial.print("$PUBX,40,RMC,0,0,0,0*47\r\n");
+//    gpsSerial.print("$PUBX,40,GGA,0,0,0,0*5A\r\n"); // DISABLE THEM ALLLL
 
     if (!SD.begin(BUILTIN_SDCARD)) {
         Serial.println("Could not mount SD card");
-        digitalWrite(LED_BUILTIN, HIGH);
         while (true);
     }
     Serial.println("Card initialised");
@@ -150,40 +278,133 @@ void performOnlineAssist() {
     // the generator token can be obtained from thingstream from ublocks
     File dataFile = SD.open("mgaonline.ubx");
     const int numbytes = dataFile.available();
-
-
-    while(dataFile.available()){
-        byte b = dataFile.read();
-        Serial.print(b, HEX);
-        Serial2.write(&b,1);
-        Serial2.flush();
+    Serial.printf("File size: %d\n", numbytes);
+    if (!dataFile) {
+        Serial.println("Failed to open file");
+        while (true);
     }
+    byte * fileBuffer = new byte[numbytes];
+    dataFile.readBytes(reinterpret_cast<char *>(fileBuffer), numbytes);
+
+    Serial.printf("%d:%d:%d,  %d/%d/%d", hour(), minute(), second(), day(), month(), year());
+    Serial.printf("GPS WEEK: %d\n", GPSweek());
+    Serial.printf("GPS time of week: %d\n", actualTimeOfWeekms());
+
+    // alter the necessary fields in the file buffer
+    // configure week number, little endian
+    int headerLength = 6;
+    unsigned short gpsweek = GPSweek();
+    fileBuffer[18+headerLength] = (gpsweek & 0x00FF);
+    fileBuffer[19+headerLength] = (gpsweek & 0xFF00) >> 8;
+
+    // configure time of week, little endian
+    unsigned long timeOfWeekms = actualTimeOfWeekms();
+    fileBuffer[20+headerLength] = (timeOfWeekms & 0x000000FF);
+    fileBuffer[21+headerLength] = (timeOfWeekms & 0x0000FF00) >> 8;
+    fileBuffer[22+headerLength] = (timeOfWeekms & 0x00FF0000) >> 16;
+    fileBuffer[23+headerLength] = (timeOfWeekms & 0xFF000000) >> 24;
+
+    Serial.println("\n\n\n");
+
+
+    gpsSerial.write(fileBuffer, numbytes);
+
+    gpsSerial.flush();
+
+
+
+    // TODO: parse the data from mgaonline.ubx and print it out
+    // TODO: figure out how to pass current time to the GPS receiver
+    // TODO: Configure the GPS receiver to use the onboard battery backed ram
 
     dataFile.close();
-    Serial.printf("Successfully read %d bytes and wrote them to the GPS.\n", numbytes);
+    delete[] fileBuffer;
+
+    Serial.println("\nFinished performOnlineAssist()\n");
+
+}
+
+void NEO6mConfig() {
+    // TODO: Configure the NEO6m using the CFG registers
+    byte CFG_NAV5_payload[36] = {0x00, 0b00000101, 8, 3}; // mask, mask, airborne (<4g), auto fix,
+    sendUbx(CFG, CFG_NAV5, 36, CFG_NAV5_payload);
+
+    /// Reconfiguring a port from one protocol to another is a two-step process: - Datasheet: 4.5
+    /** First of all, the preferred protocol(s) needs to be enabled on a port using CFG-PRT. One port can handle
+    several protocols at the same time (e.g. NMEA and UBX). By default, all ports are configured for UBX and
+    NMEA protocol so in most cases, it’s not necessary to change the port settings at all. Port settings can be
+    viewed and changed using the CFG-PRT messages.*/
+
+    byte CFG_PRT_payload[20] = {0x01, // portID PORT1 (uart)
+                                0x00, // reserved
+                                0x00, 0x00, // txReady
+                                0x00, 0x00, 0b00001000, 0b11010000, // mode mask
+                                (gpsBaudRate & 0x000000FF), (gpsBaudRate & 0x0000FF00) >> 8, (gpsBaudRate & 0x00FF0000) >> 16, (gpsBaudRate & 0xFF000000) >> 24, // baud rate
+                                0x00, 0b00000001, // inProtoMask, ubx selected
+                                0x00, 0b00000001, // outProtoMaks, ubx selected
+                                0x00, 0x00, // reserved
+                                0x00, 0x00}; // reserved
+    sendUbx(CFG, CFG_PRT, 20, CFG_PRT_payload);
+
+    byte CFG_PRT_payload2[20] = {0x02, // portID PORT2 (uart)
+                                0x00, // reserved
+                                0x00, 0x00, // txReady
+                                0x00, 0x00, 0b00001000, 0b11010000, // mode mask
+                                (gpsBaudRate & 0x000000FF), (gpsBaudRate & 0x0000FF00) >> 8, (gpsBaudRate & 0x00FF0000) >> 16, (gpsBaudRate & 0xFF000000) >> 24, // baud rate
+                                0x00, 0b00000001, // inProtoMask, ubx selected
+                                0x00, 0b00000001, // outProtoMaks, ubx selected
+                                0x00, 0x00, // reserved
+                                0x00, 0x00}; // reserved
+    sendUbx(CFG, CFG_PRT, 20, CFG_PRT_payload2);
+
+    ///  As a second step, activate certain messages on each port using CFG_MSG
+    byte a1[2] = {NAV, NAV_POSLLH};
+    //sendUbx(CFG, CFG_MSG, 2, a1);
+
+
+
+    byte CFG_CFG_payload[12] = {0,0,0,0, 0x00, 0x00, 0b00000110, 0b00011111, 0,0,0,0};
+    sendUbx(CFG, CFG_CFG, 12, CFG_CFG_payload);
 
 
 }
 
-
 void setup() {
+    delay(3000);
     // turn on the GPS
     pinMode(transistorPin, OUTPUT);
     digitalWrite(transistorPin, HIGH);
+    //delay(3000);
     Serial.begin(9600);
-    Serial2.begin(9600);
+    gpsSerial.begin(gpsBaudRate);
+    //serialClear();
+    // PUBX commands to turn off the NMEA messages
+//    byte a[] = "PUBX,40,GGA,0,0,0,0";
+//    int ck = 0;
+//    for (auto x : a) {
+//        ck = ck ^ x;
+//    }
+//    Serial.printf("THE CHECKSUM FOR GAA IS %02X", ck);
 
 
-    Serial2.print("$PUBX,40,GLL,0,0,0,0*5C\r\n");
-    Serial2.print("$PUBX,40,ZDA,0,0,0,0*44\r\n");
-    Serial2.print("$PUBX,40,VTG,0,0,0,0*5E\r\n");
-    Serial2.print("$PUBX,40,GSV,0,0,0,0*59\r\n");
-    Serial2.print("$PUBX,40,GSA,0,0,0,0*4E\r\n");
-    Serial2.print("$PUBX,40,RMC,0,0,0,0*47\r\n");
-    Serial2.print("$PUBX,40,GGA,205401,19,04,3.0,50.9,N,042.6,W,1,08,1.0,0.0,M,0.0,M,,");
+//    gpsSerial.print("$PUBX,40,GLL,0,0,0,0*5C\r\n");
+//    gpsSerial.print("$PUBX,40,ZDA,0,0,0,0*44\r\n");
+//    gpsSerial.print("$PUBX,40,VTG,0,0,0,0*5E\r\n");
+//    gpsSerial.print("$PUBX,40,GSV,0,0,0,0*59\r\n");
+//    gpsSerial.print("$PUBX,40,GSA,0,0,0,0*4E\r\n");
+//    gpsSerial.print("$PUBX,40,RMC,0,0,0,0*47\r\n");
+//    gpsSerial.print("$PUBX,40,GGA,0,0,0,0*5A\r\n"); // DISABLE THEM ALLLL
 
-    Serial2.flush();
-    Serial2.clear();
+
+
+    rtcSetup();
+    //NEO6mConfig();
+
+    performOnlineAssist();
+
+
+
+    //gpsSerial.clear();
 }
 
 
@@ -191,9 +412,19 @@ void setup() {
 
 
 void loop() {
+//    byte payload[28] = {1,2,4};
+//    getUbx(NAV, NAV_POSLLH, 28, payload);
+//    for (int i = 0; i < 28; ++i) {
+//        Serial.printf("%02X,", payload[i]);
+//    }
+//    Serial.println();
+//    byte payload[48] = {0xC4, 0xCB, 0xCE, 0x1F , 0xBA , 0xFA , 0x18 , 0xFF , 0x80 , 0x3E , 0x00 , 0x00 , 0xA0 , 0x86 ,
+//                        0x01 , 0x00 , 0x00 , 0x00 , 0xA0 , 0x08 , 0x71 , 0x5D , 0x8B , 0x08 , 0x43 , 0x96 , 0x07 , 0x00,
+//                        0x60 , 0xEA , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x23 , 0x00 , 0x00 , 0x00};
+//    sendUbx(AID, AID_INI, 48, payload);
 
-    while (Serial2.available() > 0) {
-        Serial.write(Serial2.read());
+    while (gpsSerial.available()) {
+        Serial.write(gpsSerial.read());
     }
 
 
@@ -287,7 +518,8 @@ void setup()
      sendUBX(setRMC, sizeof(setRMC)/sizeof(uint8_t));
      gps_set_sucess=getUBX_ACK(setRMC);
      }
-     *//*
+     */
+/*
 
 
 }
