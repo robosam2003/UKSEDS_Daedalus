@@ -57,7 +57,7 @@ unsigned short GPSweek() {
 }
 
 unsigned int actualTimeOfWeekms() {
-    return (unsigned int) (1000*((weekday()-1)*SECS_PER_DAY + hour()*SECS_PER_HOUR + minute()*SECS_PER_MIN + second()));
+    return (unsigned int) (1000*((weekday()-1)*SECS_PER_DAY + hour()*SECS_PER_HOUR + minute()*SECS_PER_MIN + second())) +18000;
 }
 
 void serialClear() {
@@ -68,14 +68,8 @@ void serialClear() {
 
 
 void sendUbx(byte ubxClassID, byte messageID, short payloadLength, const byte payload[]) { // Send a UBX message
-//    gpsSerial.print("$PUBX,40,GLL,0,0,0,0*5C\r\n");
-//    gpsSerial.print("$PUBX,40,ZDA,0,0,0,0*44\r\n");
-//    gpsSerial.print("$PUBX,40,VTG,0,0,0,0*5E\r\n");
-//    gpsSerial.print("$PUBX,40,GSV,0,0,0,0*59\r\n");
-//    gpsSerial.print("$PUBX,40,GSA,0,0,0,0*4E\r\n");
-//    gpsSerial.print("$PUBX,40,RMC,0,0,0,0*47\r\n");
-//    gpsSerial.print("$PUBX,40,GGA,0,0,0,0*5A\r\n"); // DISABLE THEM ALLLL
-    //serialClear();
+
+    serialClear();
 
 
     byte buffer[payloadLength + 8];
@@ -97,7 +91,7 @@ void sendUbx(byte ubxClassID, byte messageID, short payloadLength, const byte pa
     for (int i = 0; i < payloadLength; i++) {
         ckBuffer[i + 4] = payload[i];
     }
-    int n = payloadLength+ 4;
+    int n = payloadLength + 4;
     uint8_t CK_A= 0;
     uint8_t CK_B = 0;
     for (int i=0;i<n;i++)
@@ -120,23 +114,27 @@ void sendUbx(byte ubxClassID, byte messageID, short payloadLength, const byte pa
 
     char ackOrNack[64] = {0};
     if (ubxClassID == CFG) {
-        delay(500);
-        //serialClear();
+        delay(500); // needed for the reciever to have time to send ACK/NACK message.
         if (!gpsSerial.available()) { Serial.printf("The gps serial is not available."); };
-        //while (!gpsSerial.available());
+        while (!gpsSerial.available());
         int a = gpsSerial.available();
+        Serial.println();
         Serial.println(gpsSerial.available());
         gpsSerial.readBytes(ackOrNack, a);
-        for (int i = 0; i < a; i++) {
-            Serial.write(ackOrNack[i]);
-        }
 
-        Serial.clear();
+        for (int i = 0; i < a; i++) {
+            Serial.printf("%02X ", ackOrNack[i]);
+        }
+        if (ackOrNack[2] == 0x05 && ackOrNack[3] == 0x01) {
+            Serial.println("ACK-ACK");
+        } else {
+            Serial.println("NACK-NACK");
+        }
+        Serial.println();
+
     }
 
 }
-
-
 
 void getUbx(byte ubxClassID, byte messageID, short payloadLength, byte payload[]) { // Get a UBX message
     // As a quick aside, Most of this function was generated almost entirely by Github copilot, and I am truly shocked.
@@ -260,13 +258,6 @@ void performOnlineAssist() {
        is 100 ms maximum.
      • Send optional UBX-AID-HUI (health, UTC and ionosphere parameters) message.
      • Send optional UBX-AID-ALM (almanac) message. **/
-//    gpsSerial.print("$PUBX,40,GLL,0,0,0,0*5C\r\n");
-//    gpsSerial.print("$PUBX,40,ZDA,0,0,0,0*44\r\n");
-//    gpsSerial.print("$PUBX,40,VTG,0,0,0,0*5E\r\n");
-//    gpsSerial.print("$PUBX,40,GSV,0,0,0,0*59\r\n");
-//    gpsSerial.print("$PUBX,40,GSA,0,0,0,0*4E\r\n");
-//    gpsSerial.print("$PUBX,40,RMC,0,0,0,0*47\r\n");
-//    gpsSerial.print("$PUBX,40,GGA,0,0,0,0*5A\r\n"); // DISABLE THEM ALLLL
 
     if (!SD.begin(BUILTIN_SDCARD)) {
         Serial.println("Could not mount SD card");
@@ -287,13 +278,14 @@ void performOnlineAssist() {
     dataFile.readBytes(reinterpret_cast<char *>(fileBuffer), numbytes);
 
     Serial.printf("%d:%d:%d,  %d/%d/%d", hour(), minute(), second(), day(), month(), year());
-    Serial.printf("GPS WEEK: %d\n", GPSweek());
+    Serial.printf("GPS WEEK: %d\n", GPSweek()-1);
     Serial.printf("GPS time of week: %d\n", actualTimeOfWeekms());
 
-    // alter the necessary fields in the file buffer
+    // alter the necessary fields in the file buffer AID_INI
+
     // configure week number, little endian
     int headerLength = 6;
-    unsigned short gpsweek = GPSweek();
+    unsigned short gpsweek = GPSweek()-1;
     fileBuffer[18+headerLength] = (gpsweek & 0x00FF);
     fileBuffer[19+headerLength] = (gpsweek & 0xFF00) >> 8;
 
@@ -302,20 +294,29 @@ void performOnlineAssist() {
     fileBuffer[20+headerLength] = (timeOfWeekms & 0x000000FF);
     fileBuffer[21+headerLength] = (timeOfWeekms & 0x0000FF00) >> 8;
     fileBuffer[22+headerLength] = (timeOfWeekms & 0x00FF0000) >> 16;
-    fileBuffer[23+headerLength] = (timeOfWeekms & 0xFF000000) >> 24;
+    fileBuffer[23+headerLength] = (timeOfWeekms & 0xFF000000) >> 24; // This doesn't work because we change the checksum ey.
 
     Serial.println("\n\n\n");
+    uint8_t CK_A = 0;
+    uint8_t CK_B = 0;
 
+    for (int i=2;i<54;i++) {
+        CK_A += fileBuffer[i];
+        CK_B += CK_A;
+    }
+    fileBuffer[54] = CK_A;
+    fileBuffer[55] = CK_B;
+    Serial.printf("CK_A: %02X      CK_B: %02X", CK_A, CK_B);
 
-    gpsSerial.write(fileBuffer, numbytes);
+    for (int i=0;i<56;i++) {
+        Serial.printf("%02X ",fileBuffer[i]);
+    }
+    Serial.printf("\nAvailable for write: %d\n", gpsSerial.availableForWrite());
+    for (int  i=0;i<numbytes; i++) {
+        gpsSerial.write(fileBuffer[i]);
+        gpsSerial.flush();
 
-    gpsSerial.flush();
-
-
-
-    // TODO: parse the data from mgaonline.ubx and print it out
-    // TODO: figure out how to pass current time to the GPS receiver
-    // TODO: Configure the GPS receiver to use the onboard battery backed ram
+    }
 
     dataFile.close();
     delete[] fileBuffer;
@@ -325,9 +326,16 @@ void performOnlineAssist() {
 }
 
 void NEO6mConfig() {
-    // TODO: Configure the NEO6m using the CFG registers
+    /// Configure the NEO6m using the CFG registers
+
+    // Set power mode to Max performance mode
+    byte CFG_RXM_payload[2] = {0x08, 0x00}; // reserved, lpMode (0 for max performance)
+    sendUbx(CFG, CFG_RXM, 2, CFG_RXM_payload);
+
+
+    // Set the NEO6m to use the onboard battery backed ram
     byte CFG_NAV5_payload[36] = {0x00, 0b00000101, 8, 3}; // mask, mask, airborne (<4g), auto fix,
-    sendUbx(CFG, CFG_NAV5, 36, CFG_NAV5_payload);
+    sendUbx(CFG, CFG_NAV5, 36, CFG_NAV5_payload); // RECIEVED ACK-ACK - Success!
 
     /// Reconfiguring a port from one protocol to another is a two-step process: - Datasheet: 4.5
     /** First of all, the preferred protocol(s) needs to be enabled on a port using CFG-PRT. One port can handle
@@ -338,28 +346,34 @@ void NEO6mConfig() {
     byte CFG_PRT_payload[20] = {0x01, // portID PORT1 (uart)
                                 0x00, // reserved
                                 0x00, 0x00, // txReady
-                                0x00, 0x00, 0b00001000, 0b11010000, // mode mask
+                                0b11000000, 0b00001000, 0x00, 0x00,   // mode mask
                                 (gpsBaudRate & 0x000000FF), (gpsBaudRate & 0x0000FF00) >> 8, (gpsBaudRate & 0x00FF0000) >> 16, (gpsBaudRate & 0xFF000000) >> 24, // baud rate
-                                0x00, 0b00000001, // inProtoMask, ubx selected
-                                0x00, 0b00000001, // outProtoMaks, ubx selected
+                                0b00000001, 0x00,  // inProtoMask, ubx selected
+                                0b00000001, 0x00,  // outProtoMaks, ubx selected
                                 0x00, 0x00, // reserved
                                 0x00, 0x00}; // reserved
-    sendUbx(CFG, CFG_PRT, 20, CFG_PRT_payload);
+    sendUbx(CFG, CFG_PRT, 20, CFG_PRT_payload); // RECIEVED ACK-NACK
 
-    byte CFG_PRT_payload2[20] = {0x02, // portID PORT2 (uart)
-                                0x00, // reserved
-                                0x00, 0x00, // txReady
-                                0x00, 0x00, 0b00001000, 0b11010000, // mode mask
-                                (gpsBaudRate & 0x000000FF), (gpsBaudRate & 0x0000FF00) >> 8, (gpsBaudRate & 0x00FF0000) >> 16, (gpsBaudRate & 0xFF000000) >> 24, // baud rate
-                                0x00, 0b00000001, // inProtoMask, ubx selected
-                                0x00, 0b00000001, // outProtoMaks, ubx selected
-                                0x00, 0x00, // reserved
-                                0x00, 0x00}; // reserved
-    sendUbx(CFG, CFG_PRT, 20, CFG_PRT_payload2);
+    // set update rate to 5Hz
+    short measrate = 100; // ms
+    byte CFG_RATE_payload[6] = {(measrate & 0xFF), ((measrate>>8) & 0xFF), // update rate
+                                0x01, 0x00, // nav rate - always set to 1
+                                0x01, 0x00}; // time ref - 1 for gps time, 0 for utc
+    sendUbx(CFG, CFG_RATE, 6, CFG_RATE_payload);
+
 
     ///  As a second step, activate certain messages on each port using CFG_MSG
-    byte a1[2] = {NAV, NAV_POSLLH};
-    //sendUbx(CFG, CFG_MSG, 2, a1);
+    byte CFG_MSG_NAV_POLLSH_payload[8] = {NAV, NAV_POSLLH, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00};
+    sendUbx(CFG, CFG_MSG, 8, CFG_MSG_NAV_POLLSH_payload);
+//    // add nmea sentences:
+//    byte CFG_MSG_GPGSA[8] = {0xF0, 0x02 ,0x00, 0x01, 0x01, 0x00, 0x00, 0x00};
+//    sendUbx(CFG, CFG_MSG, 8, CFG_MSG_GPGSA);
+//
+//    byte CFG_MSG_GPGSV[8] = {0xF0, 0x03 ,0x00, 0x01, 0x01, 0x00, 0x00, 0x00};
+//    sendUbx(CFG, CFG_MSG, 8, CFG_MSG_GPGSV);
+
+//    byte CFG_MSG_GPGAA[8] = {0xF0, 0x00 ,0x00, 0x01, 0x01, 0x00, 0x00, 0x00};
+//    sendUbx(CFG, CFG_MSG, 8, CFG_MSG_GPGAA);
 
 
 
@@ -370,14 +384,15 @@ void NEO6mConfig() {
 }
 
 void setup() {
-    delay(3000);
+    rtcSetup();
+
     // turn on the GPS
     pinMode(transistorPin, OUTPUT);
     digitalWrite(transistorPin, HIGH);
-    //delay(3000);
+    delay(3000);
     Serial.begin(9600);
     gpsSerial.begin(gpsBaudRate);
-    //serialClear();
+    serialClear();
     // PUBX commands to turn off the NMEA messages
 //    byte a[] = "PUBX,40,GGA,0,0,0,0";
 //    int ck = 0;
@@ -387,22 +402,24 @@ void setup() {
 //    Serial.printf("THE CHECKSUM FOR GAA IS %02X", ck);
 
 
-//    gpsSerial.print("$PUBX,40,GLL,0,0,0,0*5C\r\n");
-//    gpsSerial.print("$PUBX,40,ZDA,0,0,0,0*44\r\n");
-//    gpsSerial.print("$PUBX,40,VTG,0,0,0,0*5E\r\n");
-//    gpsSerial.print("$PUBX,40,GSV,0,0,0,0*59\r\n");
-//    gpsSerial.print("$PUBX,40,GSA,0,0,0,0*4E\r\n");
-//    gpsSerial.print("$PUBX,40,RMC,0,0,0,0*47\r\n");
-//    gpsSerial.print("$PUBX,40,GGA,0,0,0,0*5A\r\n"); // DISABLE THEM ALLLL
+    gpsSerial.print("$PUBX,40,GLL,0,0,0,0*5C\r\n");
+    gpsSerial.print("$PUBX,40,ZDA,0,0,0,0*44\r\n");
+    gpsSerial.print("$PUBX,40,VTG,0,0,0,0*5E\r\n");
+    gpsSerial.print("$PUBX,40,GSV,0,0,0,0*59\r\n");
+    gpsSerial.print("$PUBX,40,GSA,0,0,0,0*4E\r\n");
+    gpsSerial.print("$PUBX,40,RMC,0,0,0,0*47\r\n");
+    gpsSerial.print("$PUBX,40,GGA,0,0,0,0*5A\r\n"); // DISABLE THEM ALLLL
+    delay(100);
 
 
+    NEO6mConfig();
 
-    rtcSetup();
-    //NEO6mConfig();
+
 
     performOnlineAssist();
 
 
+    //gpsSerial.print("$PUBX,40,GGA,0,0,0,0*5A\r\n"); // DISABLE THEM ALLLL
 
     //gpsSerial.clear();
 }
@@ -412,20 +429,36 @@ void setup() {
 
 
 void loop() {
-//    byte payload[28] = {1,2,4};
-//    getUbx(NAV, NAV_POSLLH, 28, payload);
-//    for (int i = 0; i < 28; ++i) {
-//        Serial.printf("%02X,", payload[i]);
-//    }
-//    Serial.println();
-//    byte payload[48] = {0xC4, 0xCB, 0xCE, 0x1F , 0xBA , 0xFA , 0x18 , 0xFF , 0x80 , 0x3E , 0x00 , 0x00 , 0xA0 , 0x86 ,
-//                        0x01 , 0x00 , 0x00 , 0x00 , 0xA0 , 0x08 , 0x71 , 0x5D , 0x8B , 0x08 , 0x43 , 0x96 , 0x07 , 0x00,
-//                        0x60 , 0xEA , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x23 , 0x00 , 0x00 , 0x00};
-//    sendUbx(AID, AID_INI, 48, payload);
-
-    while (gpsSerial.available()) {
-        Serial.write(gpsSerial.read());
+    // Read NAV-POSLLH
+    byte POSLLH[36] = {}; // TODO: switch this to polling so that we can use multiple commands?
+    while (gpsSerial.available() < 36);
+    while (gpsSerial.peek() != 0xB5) { gpsSerial.read(); }
+    gpsSerial.readBytes(POSLLH, 36);
+    for (unsigned char i : POSLLH) {
+        Serial.printf("%02X ", i);
     }
+    unsigned int towMs = POSLLH[6] | POSLLH[7] << 8 | POSLLH[8] << 16 | POSLLH[9] << 24;
+    double longitude = ((signed int) (POSLLH[10] | POSLLH[11] << 8 | POSLLH[12] << 16 | POSLLH[13] << 24)) / 10000000.0;
+    double latitude = ((signed int) (POSLLH[14] | POSLLH[15] << 8 | POSLLH[16] << 16 | POSLLH[17] << 24)) / 10000000.0;
+    double height = ((signed int) (POSLLH[18] | POSLLH[19] << 8 | POSLLH[20] << 16 | POSLLH[21] << 24)) / 1000.0;
+    double hMSL = POSLLH[22] | POSLLH[23] << 8 | POSLLH[24] << 16 | POSLLH[25] << 24;
+    signed int hAcc = POSLLH[26] | POSLLH[27] << 8 | POSLLH[28] << 16 | POSLLH[29] << 24;
+    signed int vAcc = POSLLH[30] | POSLLH[31] << 8 | POSLLH[32] << 16 | POSLLH[33] << 24;
+    Serial.printf("\nTOW:        %d\n", towMs);
+    Serial.printf("Actual TOW: %d\n", actualTimeOfWeekms()); // actual tow and tow from gps are synced
+    Serial.printf("Time %d:%d:%d\n", hour(), minute(), second());
+    Serial.printf("LONG: %lf\n", longitude);
+    Serial.printf("LAT: %lf\n", latitude);
+    Serial.printf("HEIGHT(m): %lf\n", height);
+    Serial.printf("HMSL(m): %lf\n", hMSL);
+    Serial.printf("HACC(m): %d\n", hAcc/1000);
+    Serial.printf("VACC(m): %d\n", vAcc/1000);
+
+
+
+
+    Serial.println();
+
 
 
 }
