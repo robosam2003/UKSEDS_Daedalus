@@ -1,50 +1,9 @@
-/*
-   RadioLib SX127x Receive with Interrupts Example
-
-   This example listens for LoRa transmissions and tries to
-   receive them. Once a packet is received, an interrupt is
-   triggered. To successfully receive data, the following
-   settings have to be the same on both transmitter
-   and receiver:
-    - carrier frequency
-    - bandwidth
-    - spreading factor
-    - coding rate
-    - sync word
-
-   Other modules from SX127x/RFM9x family can also be used.
-
-   For default module settings, see the wiki page
-   https://github.com/jgromes/RadioLib/wiki/Default-configuration#sx127xrfm9x---lora-modem
-
-   For full API reference, see the GitHub Pages
-   https://jgromes.github.io/RadioLib/
-*/
-
-// include the library
-#include <Arduino.h>
-#include <RadioLib.h>
+//
+// Created by robos on 03/05/2022.
+//
+#include <RFM96WrecieveLORA.h>
 
 
-#define WRITE 0b10000000
-#define READ 0b00000000
-#define CS 37
-
-// SX1278 has the following connections:
-// NSS pin:   10
-// DIO0 pin:  2
-// RESET pin: 9
-// DIO1 pin:  3
-RFM96 radio = new Module(10, 2, 9, 3);
-
-// prototypes
-void setFlag();
-void SPIREGSET(byte address, byte value);
-int SPIREADREG(byte address, int bytesToRead);
-int state;
-// or using RadioShield
-// https://github.com/jgromes/RadioShield
-//SX1278 radio = RadioShield.ModuleA;
 
 void RFM96WrecieveLORASetup() {
 
@@ -96,24 +55,6 @@ void RFM96WrecieveLORASetup() {
     // radio.scanChannel();
 }
 
-
-void setup() {
-    Serial.begin(500000);
-
-
-}
-
-// flag to indicate that a packet was received
-volatile bool receivedFlag = false;
-
-// disable interrupt when it's not needed
-volatile bool enableInterrupt = true;
-
-// this function is called when a complete packet
-// is received by the module
-// IMPORTANT: this function MUST be 'void' type
-//            and MUST NOT have any arguments!
-
 void setFlag() {
     // check if the interrupt is enabled
     if(!enableInterrupt) {
@@ -123,9 +64,6 @@ void setFlag() {
     // we got a packet, set the flag
     receivedFlag = true;
 }
-
-
-byte byteArr[255];
 
 void RFM96WrecieveBytesLORA() {
     // check if the flag is set
@@ -191,11 +129,6 @@ void RFM96WrecieveBytesLORA() {
         // enable interrupt service routine
         enableInterrupt = true;
     }
-}
-
-void loop() {
-
-
 }
 
 int SPIREADREG(byte address, int bytesToRead){  // FIFO
