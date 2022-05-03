@@ -1,0 +1,25 @@
+void calcRotationVect(signed short acc_meas[3], signed short ori[3], double returnVect[3]){ // calculates the absolute acceleration (relative to north and flat) based on acceleration data and orientation data
+    double degToRad = (2*pi)/360;
+    double roll = ori[2]*degToRad; // in radians
+    double pitch = ori[1]*degToRad; // in radians
+    double heading = ori[0]*degToRad; // in radians
+
+    double rotMatX[3][3] = { {1, 0,          0         },
+                             {0, cos(roll),  -sin(roll) },
+                             {0, sin(roll), cos(roll) } };
+
+    double rotMatY[3][3] = { { cos(pitch),  0, sin(pitch) },
+                             { 0,           1, 0          },
+                             { -sin(pitch), 0, cos(pitch) } };
+
+    double rotMatZ[3][3] = { { cos(heading), -sin(heading), 0 },
+                             { sin(heading), cos(heading),  0 },
+                             { 0,            0,             1} };
+
+    for (int i=0; i<3; i++) {
+        for (int j=0; j<3; j++) {
+            returnVect[i] += rotMatZ[i][j]*rotMatY[i][j]*rotMatX[i][j]*acc_meas[i];
+        }
+    }
+
+}
