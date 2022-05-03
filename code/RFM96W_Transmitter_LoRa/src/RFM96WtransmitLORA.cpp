@@ -1,30 +1,7 @@
-
-// include the library
-#include <Arduino.h>
-#include <RadioLib.h>
-
-#define WRITE 0b10000000
-#define READ 0b00000000
-#define CS 37
-#define transistorPin 32
-elapsedMicros microTimer;
-
-
-
-// NSS pin:   37
-// DIO0 pin:  2
-// RESET pin: 9
-// DIO1 pin:  3
-RFM96 radio = new Module(CS, 2, 9, 3);
-
-// prototypes
-void setFlag();
-void SPIREGSET(byte address, byte value);
-int SPIREADREG(byte address, int bytesToRead);
-
-// save transmission state between loops
-int transmissionState = RADIOLIB_ERR_NONE;
-
+//
+// Created by robos on 03/05/2022.
+//
+#include "RFM96WtransmitLORA.h"
 
 void RFM96WtransmitSetup() { // assumes serial is setup.
     // initialize SX1278 with default settings
@@ -64,22 +41,6 @@ void RFM96WtransmitSetup() { // assumes serial is setup.
     transmissionState = radio.startTransmit("Hello World!");
 }
 
-
-void setup() {
-    Serial.begin(9600);
-
-
-
-}
-
-// flag to indicate that a packet was sent
-volatile bool transmittedFlag = false;
-
-// disable interrupt when it's not needed
-volatile bool enableInterrupt = true;
-
-
-
 int SPIREADREG(byte address, int bytesToRead){  // FIFO
     address = READ | address; // puts 0 int the 8th bit.
     byte inByte = 0;
@@ -111,9 +72,6 @@ void setFlag() {
     // we sent a packet, set the flag
     transmittedFlag = true;
 }
-
-
-
 
 void transmitData(byte arr[]) {
     // check if the previous transmission finished
@@ -166,16 +124,4 @@ void transmitData(byte arr[]) {
         // enable interrupt service routine
         enableInterrupt = true;
     }
-}
-
-int counter = 0;
-byte arr[255] = {};
-void loop() {
-    for (int i=0;i<255;i++) { arr[i] = counter; }
-    unsigned long a = micros();
-    transmitData(arr);
-    unsigned long b = micros();
-    if (Serial) {Serial.printf("Transmission (LoRa) took %d (us)", b-a);}
-
-    counter++;
 }
