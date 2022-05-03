@@ -1,5 +1,3 @@
-// Test Teensy SDIO with write busy in a data logger demo.
-//
 // The driver writes to the uSDHC controller's FIFO then returns
 // while the controller writes the data to the SD.  The first sector
 // puts the controller in write mode and takes about 11 usec on a
@@ -13,14 +11,14 @@
 #define SD_CONFIG  SdioConfig(FIFO_SDIO)
 
 // Interval between points for 25 ksps.
-#define LOG_INTERVAL_USEC 40
+//#define LOG_INTERVAL_USEC 40
 
-// Size to log 10 byte lines at 25 kHz for more than ten minutes.
-#define LOG_FILE_SIZE 10*25000*600  // 150,000,000 bytes.
+#define LOG_FILE_SIZE 10*25000*600  // 150,000,000 bytes. // TODO: determine the minumum file size for our rocket
 
 // Space to hold more than 800 ms of data for 10 byte lines at 25 ksps.
 #define RING_BUF_CAPACITY 400*512
-#define LOG_FILENAME "SdioLogger10mychanges.csv"
+
+#define LOG_FILENAME "SdioLogger10mychanges.csv" // csv is far easier than other formats.
 
 SdFs sd;
 FsFile file;
@@ -47,7 +45,7 @@ void sdSetup() {
     }
     // File must be pre-allocated to avoid huge
     // delays searching for free clusters.
-    if (!file.preAllocate(LOG_FILE_SIZE)) {
+    if (!file.preAllocate(LOG_FILE_SIZE)) { // if i dont preallocate, it takes much longer.
         Serial.println("preAllocate failed\n");
         file.close();
         return;
@@ -55,7 +53,8 @@ void sdSetup() {
     // initialize the RingBuf.
     rb.begin(&file);
 }
-void logData(struct dataStruct data) {
+
+void logData(byte arr[256]) { // can log up to 512 bytes
     // Max RingBuf used bytes. Useful to understand RingBuf overrun.
     size_t maxUsed = 0;
 
@@ -88,8 +87,8 @@ void logData(struct dataStruct data) {
     }
 
 
-    rb.printf("%d,%d,%d,",data.acc_rawx, data.acc_rawy, data.acc_rawz);
-    for (int i=0;i<100;i++) { rb.printf("%d,",data.arr[i]); }
+    rb.printf("%d,%d,%d,", arr[0], arr[1], arr[2]);
+    for (int i=0;i<100;i++) { rb.printf("%d,", arr[i]); }
     rb.println();
     // Print adc into RingBuf.
     if (rb.getWriteError()) {
@@ -100,7 +99,6 @@ void logData(struct dataStruct data) {
 
 
     // Write any RingBuf data to file.
-
     /*rb.sync();
 
 
@@ -133,9 +131,8 @@ void setup() {
 }
 
 void loop() {
-    struct dataStruct mydata = {0,1,2, {1,2,3,4,66,77,88,112,123,255}};
     uint32_t beforeLogData = micros();
-    logData(mydata);
+    //logData(mydata);
     uint32_t afterLogData = micros();
     Serial.println(afterLogData-beforeLogData);
     delay(10);
