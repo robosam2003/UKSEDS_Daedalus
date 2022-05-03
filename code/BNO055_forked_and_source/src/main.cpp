@@ -1,7 +1,7 @@
 /// \b INCLUDES
 #include <Arduino.h>
 #include "BNO055.h"
-#include "i2c_driver_wire.h"
+#include <Wire.h>
 #include "SimpleKalmanFilter.h"
 
 
@@ -15,11 +15,10 @@ Vector<double> gyr_biases = {0,0,0};
 
 const int numDR = 50; // number of data points to average
 double prevVect[numDR][9] = {}; /// Holds previous values of (true acceleration), velocity and omega (from gyro)
-
 Vector<double> omegaAverage = {0,0,0}; // live bias calculations
 Vector<double> accAverage = {0,0,0};
-double biasAverageOmegaThreshold = 0.5;
-double biasAverageAccThreshold = 0.5;
+double biasAverageOmegaThreshold = 0.3;
+double biasAverageAccThreshold = 0.3;
 
 Vector<double> pos = {0}; // For dead reckoning purposes.
 Vector<double> vel = {0};
@@ -42,7 +41,6 @@ Vector<double> trueAccVect;
 
 /// \b Function \b Prototypes
 // TODO: ADD function prototypes at end
-
 bno055_calib_stat_t calibrate();
 void getInitialOrientation();
 
@@ -353,7 +351,7 @@ void deadReckoning(Vector<double> acc, Vector<double> omega, int updateTimeUs, d
         if (abs(trueAccVect[i]) > 0) {
             vel[i] += (updateTimeUs*0.000001)*0.5*(trueAccVect[i] + prevValues[DRcounter % numDR][i]);
         }
-        prevValues[DRcounter % numDR][i] = trueAccVect[i]; // setting previous value of acceleration for next time
+        prevValues[DRcounter % numDR][i] = trueAccVect[i]; // setting previous value of true acceleration for next time
         /// Position calculation, First order hold
         /// If the value is within the range of +- 0.1 (due to noise) it is deemed insignificant
         if ( abs(prevValues[DRcounter % numDR][3+i]) != abs(vel[i]) ) {
@@ -362,8 +360,8 @@ void deadReckoning(Vector<double> acc, Vector<double> omega, int updateTimeUs, d
         prevValues[DRcounter % numDR][3+i] = static_cast<double>(vel[i]); // setting previous value of velocity for next time.
     }
 
+
     /// Live Accelerometer and gyroscope bias estimation\n
-    //Serial.printf("DEAD RECKONING\n");
     if (DRcounter < numDR) {
         for (int j=0;j<3;j++) {
             omegaAverage[j] = (omegaAverage[j]*DRcounter + prevValues[DRcounter][6+j]) / (DRcounter+1);
@@ -394,23 +392,23 @@ void deadReckoning(Vector<double> acc, Vector<double> omega, int updateTimeUs, d
                accAverage[0], accAverage[1], accAverage[2]);
 
 
-        double gain = 1;
+        double gain = -0.5;
         for (int i=0;i<3;i++) {
             if (withinRangeOmega[i]) {
                 Serial.printf("\nFLAG: Changing omega bias %d\n", i);
                 Serial.printf("     offset before was: %lf\n", gyr_biases[i]);
                 gyr_biases[i] = omegaAverage[i] * gain;
+                DRcounter = -1; // reset
                 Serial.printf("     offset after is:   %lf\n", gyr_biases[i]);
 
             }
         }
-
-
         for (int i=0;i<3;i++) {
             if (withinRangeAcc[i]) {
                 Serial.printf("\nFLAG: Changing acc bias %d\n", i);
                 Serial.printf("     offset before was: %lf\n", acc_biases[i]);
-                acc_biases[i] = accAverage[i]*gain;
+                acc_biases[i] += accAverage[i];
+                DRcounter = -1; // reset
                 Serial.printf("     offset after is:   %lf\n", acc_biases[i]);
 
             }
@@ -418,9 +416,14 @@ void deadReckoning(Vector<double> acc, Vector<double> omega, int updateTimeUs, d
 
     }
     DRcounter++;
+
 }
 
 
+
+void interruptCallback() {
+    digitalWrite(13, !digitalRead(13));
+}
 
 
 void BNO055Setup() {
@@ -461,12 +464,27 @@ void BNO055Setup() {
     //sensor.writeRegister(BNO055_AXIS_MAP_CONFIG, 0x24); // TODO: Check that this will be correct for our pcb (Axis remap);
     sensor.writeRegister(BNO055_AXIS_MAP_SIGN, 0b00000000);
 
+    // interrupt setup
+    BNO055::AccelHighGInterrupt interrupt(
+            sensor,
+            (new BNO055::Interrupt::EnabledAxes)->enableX().enableY().enableZ(),
+            interruptCallback,
+            5);
+    // write the configuration to the BNO055
+    interrupt.setup();
+
+    // enable this interrupt
+    interrupt.enable();
+
+    // route this interrupt to the INT pin on the sensor
+    interrupt.mask();
+
+
+
     //calibrate();
     //acc_biases = find_acc_biases();
     //gyr_biases = find_gyr_biases();
-
-    //getInitialOrientation();
-
+    getInitialOrientation();
     sensor.setOperationMode(AMG);
 }
 
@@ -474,7 +492,7 @@ void BNO055Setup() {
 void setup() {
     Wire.setClock(1000000);  // i2c seems to work great at 1Mhz
     Wire.begin();
-
+    pinMode(13, OUTPUT);
     BNO055Setup();
 
 }
@@ -483,7 +501,7 @@ void setup() {
 
 
 void loop() {
-    uint32_t startOfLoop = micros();
+    /*uint32_t startOfLoop = micros();
 
     /// Data Aquisition
     bno055_burst_t data = sensor.getAllData();
@@ -496,7 +514,7 @@ void loop() {
 
     //eul[0] = 360-eul[0];   eul[1] = -eul[1];  // necessary to have all the angles going anticlockise-> increasing. - for the reference frame conversion in fusion mode
 
-/// Kalman filtering
+    /// Kalman filtering
     updateFilters(gyroRaw, BNO055accRaw);
 
 
@@ -518,5 +536,6 @@ void loop() {
 
     uint32_t endOfLoop = micros();
     //Serial.println(endOfLoop - startOfLoop);
-    delayMicroseconds( ((endOfLoop-startOfLoop) < cycleTimeus ) ? (cycleTimeus- (endOfLoop - startOfLoop) ) : 0 );
+    delayMicroseconds( ((endOfLoop-startOfLoop) < cycleTimeus ) ? (cycleTimeus- (endOfLoop - startOfLoop) ) : 0 );*/
+    sensor.clearInterrupt();
 }
