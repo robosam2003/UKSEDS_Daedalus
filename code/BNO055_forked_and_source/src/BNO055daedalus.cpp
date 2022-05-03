@@ -1,61 +1,8 @@
-// Created by robosam2003
+//
+// Created by robosam2003 on 03/05/2022.
+//
 
-
-/// \b INCLUDES
-#include <Arduino.h>
-#include "BNO055.h"
-#include <Wire.h>
-#include "SimpleKalmanFilter.h"
-
-
-/// \b GLOBAL \b VARIABLES
-const byte BNO055_I2C_ADDRESS = 0x28;
-BNO055 sensor(BNO055_I2C_ADDRESS, &Wire);
-
-Vector<double> acc_biases = {0,0,0}; // biases for the accelerometers and gyros
-Vector<double> gyr_biases = {0,0,0};
-
-
-const int numDR = 50; // number of data points to average
-double prevVect[numDR][9] = {}; /// Holds previous values of (true acceleration), velocity and omega (from gyro)
-Vector<double> omegaAverage = {0,0,0}; // live bias calculations
-Vector<double> accAverage = {0,0,0};
-double biasAverageOmegaThreshold = 0.3;
-double biasAverageAccThreshold = 0.3;
-
-Vector<double> pos = {0}; // For dead reckoning purposes.
-Vector<double> vel = {0};
-Vector<double> ori = {0};
-int DRcounter = 0;
-
-SimpleKalmanFilter filteredAccBNO055X = SimpleKalmanFilter(0.05, 0.05, 0.01);
-SimpleKalmanFilter filteredAccBNO055Y = SimpleKalmanFilter(0.05, 0.05, 0.01);
-SimpleKalmanFilter filteredAccBNO055Z = SimpleKalmanFilter(0.05, 0.05, 0.01);
-
-SimpleKalmanFilter filteredGyroX = SimpleKalmanFilter(0.05, 0.05, 0.01);
-SimpleKalmanFilter filteredGyroY = SimpleKalmanFilter(0.05, 0.05, 0.01);
-SimpleKalmanFilter filteredGyroZ = SimpleKalmanFilter(0.05, 0.05, 0.01);
-
-Vector<double> filteredAccBNO055;
-Vector<double> filteredGyro;
-Vector<double> trueAccVect;
-
-#define cycleTimeus 10000
-
-/// \b Function \b Prototypes
-// TODO: ADD function prototypes at end
-void updateFilters(Vector<double> gyro, Vector<double> acc);
-bno055_calib_stat_t calibrate();
-double magnitude(Vector<double> vect);
-void calcRotationVect(Vector<double> acc_meas, Vector<double> ori, Vector<double>& returnVect);
-Vector<double> find_acc_biases();
-Vector<double> find_gyr_biases();
-void remove_biases(Vector<double> acc_biases, Vector<double> gyrOffsets);
-void getInitialOrientation();
-void deadReckoning(Vector<double> acc, Vector<double> omega, int updateTimeUs, double prevValues[numDR][9]);
-void interruptCallback();
-void BNO055Setup();
-
+#include "BNO055daedalus.h"
 
 
 void updateFilters(Vector<double> gyro, Vector<double> acc){ // TODO: Add any other data points you want filtered
@@ -291,17 +238,17 @@ Vector<double> find_gyr_biases() {
 void remove_biases(Vector<double> acc_biases, Vector<double> gyrOffsets){
 
     signed short addresses[3][9] = {{ACC_OFFSET_X_LSB, ACC_OFFSET_X_MSB,
-                                     ACC_OFFSET_Y_LSB, ACC_OFFSET_Y_MSB,
-                                     ACC_OFFSET_Z_LSB, ACC_OFFSET_Z_MSB,
-                                     static_cast<short>(acc_biases[0]*100), static_cast<short>(acc_biases[1]*100), static_cast<short>(acc_biases[2]*100) },
+                                            ACC_OFFSET_Y_LSB, ACC_OFFSET_Y_MSB,
+                                            ACC_OFFSET_Z_LSB, ACC_OFFSET_Z_MSB,
+                                            static_cast<short>(acc_biases[0]*100), static_cast<short>(acc_biases[1]*100), static_cast<short>(acc_biases[2]*100) },
                                     {MAG_OFFSET_X_LSB, MAG_OFFSET_X_MSB,
-                                     MAG_OFFSET_Y_LSB, MAG_OFFSET_Y_MSB,
-                                     MAG_OFFSET_Z_LSB, MAG_OFFSET_Z_MSB,
-                                     0, 0, 0},
+                                            MAG_OFFSET_Y_LSB, MAG_OFFSET_Y_MSB,
+                                            MAG_OFFSET_Z_LSB, MAG_OFFSET_Z_MSB,
+                                            0, 0, 0},
                                     {GYR_OFFSET_X_LSB, GYR_OFFSET_X_MSB,
-                                     GYR_OFFSET_Y_LSB, GYR_OFFSET_Y_MSB,
-                                     GYR_OFFSET_Z_LSB, GYR_OFFSET_Z_MSB,
-                                     static_cast<short>(gyrOffsets[0]*16), static_cast<short>(gyrOffsets[1]*16), static_cast<short>(gyrOffsets[2]*16)}};
+                                            GYR_OFFSET_Y_LSB, GYR_OFFSET_Y_MSB,
+                                            GYR_OFFSET_Z_LSB, GYR_OFFSET_Z_MSB,
+                                            static_cast<short>(gyrOffsets[0]*16), static_cast<short>(gyrOffsets[1]*16), static_cast<short>(gyrOffsets[2]*16)}};
 
     for (int i = 0; i<3; i++) {
         signed short x = addresses[i][6];
@@ -401,8 +348,8 @@ void deadReckoning(Vector<double> acc, Vector<double> omega, int updateTimeUs, d
         }
 
         Serial.printf("OMEGA av: %lf, %lf, %lf      ACC av:%lf, %lf, %lf\n",
-               omegaAverage[0], omegaAverage[1], omegaAverage[2],
-               accAverage[0], accAverage[1], accAverage[2]);
+                      omegaAverage[0], omegaAverage[1], omegaAverage[2],
+                      accAverage[0], accAverage[1], accAverage[2]);
 
 
         double gain = -0.5;
@@ -451,12 +398,12 @@ void BNO055Setup() {
             sensor.setAccelerometerConfig(0b00010011); //Normal mode, 125Hz, 16G
             sensor.setGyroscopeConfig(0b00010010); // 116 Hz, 500dps
             break;
-        /// 200Hz
+            /// 200Hz
         case 5000:
             sensor.setAccelerometerConfig(0b00010111); //Normal mode, 250Hz, 16G
             sensor.setGyroscopeConfig(0b00001010); // 230 Hz, 500dps
             break;
-        /// 400Hz
+            /// 400Hz
         case 2500:
             sensor.setAccelerometerConfig(0b00011011); //Normal mode, 500Hz, 16G
             sensor.setGyroscopeConfig(0b00000010); // 523 Hz, 500dps
@@ -496,55 +443,4 @@ void BNO055Setup() {
     //gyr_biases = find_gyr_biases();
     getInitialOrientation();
     sensor.setOperationMode(AMG);
-}
-
-void setup() {
-    Wire.setClock(1000000);  // i2c seems to work great at 1Mhz
-    Wire.begin();
-    pinMode(13, OUTPUT);
-    BNO055Setup();
-
-}
-
-
-
-
-void loop() {
-    /*uint32_t startOfLoop = micros();
-
-    /// Data Aquisition
-    bno055_burst_t data = sensor.getAllData();
-    Vector<double> BNO055accRaw = data.accel;
-    Vector<double> magRaw = data.mag;
-    Vector<double> gyroRaw = data.gyro;
-
-    /// Removing biases for internal integration of gyroscopes and accelerometers. \n Results in higher precision of calculation than setting bias/offset registers
-    for(int i=0;i<3;i++) { BNO055accRaw[i] -= acc_biases[i]; gyroRaw[i] -= gyr_biases[i]; }
-
-    //eul[0] = 360-eul[0];   eul[1] = -eul[1];  // necessary to have all the angles going anticlockise-> increasing. - for the reference frame conversion in fusion mode
-
-    /// Kalman filtering
-    updateFilters(gyroRaw, BNO055accRaw);
-
-
-    /// Calculations
-    deadReckoning(filteredAccBNO055, filteredGyro, cycleTimeus, prevVect);
-    //deadReckoning(BNO055accRaw, gyroRaw, cycleTimeus, prevVect);
-
-//    Serial.printf("TAV: %lf, %lf, %lf  |  VEL: %lf, %lf, %lf  |  POS: %lf, %lf, %lf  |  ORI: %lf, %lf, %lf\n",
-//                  trueAccVect[0], trueAccVect[1], trueAccVect[2],
-//                  vel[0], vel[1], vel[2],
-//                  pos[0], pos[1], pos[2],
-//                  ori[0], ori[1], ori[2]);
-
-//    Serial.printf("GYRO: %lf, %lf, %lf     ", filteredGyro[0], filteredGyro[1], filteredGyro[2]);
-//    Serial.printf("ACC : %lf, %lf, %lf     ", filteredAccBNO055[0], filteredAccBNO055[1], filteredAccBNO055[2]);
-//    Serial.printf("POS: %lf, %lf, %lf\n", pos[0], pos[1], pos[2]);
-
-
-
-    uint32_t endOfLoop = micros();
-    //Serial.println(endOfLoop - startOfLoop);
-    delayMicroseconds( ((endOfLoop-startOfLoop) < cycleTimeus ) ? (cycleTimeus- (endOfLoop - startOfLoop) ) : 0 );*/
-    sensor.clearInterrupt();
 }
