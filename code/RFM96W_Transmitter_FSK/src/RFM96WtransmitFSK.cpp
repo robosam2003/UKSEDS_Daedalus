@@ -1,17 +1,8 @@
-#include <Arduino.h>
-#include <RadioLib.h>
+//
+// Created by robos on 03/05/2022.
+//
 
-// RFM96W has the following connections:
-// NSS pin:   10
-// DIO0 pin:  2
-// RESET pin: 9
-// DIO1 pin:  3
-RFM96 radio = new Module(37, 2, 9, 3);
-
-void setFlag();
-
-// save transmission state between loops
-int transmissionState = RADIOLIB_ERR_NONE;
+#include "RFM96WtransmitFSK.h"
 
 void RFM96WtransmitFSKsetup() { // assumes serial is setup
     Serial.print(F("[SX1278] Initializing ... "));
@@ -47,15 +38,6 @@ void RFM96WtransmitFSKsetup() { // assumes serial is setup
     */
 }
 
-void setup() {
-
-}
-
-// flag to indicate that a packet was sent
-volatile bool transmittedFlag = false;
-
-// disable interrupt when it's not needed
-volatile bool enableInterrupt = true;
 
 // this function is called when a complete packet
 // is transmitted by the module
@@ -105,17 +87,4 @@ void transmitData(byte arr[]) {
         // enable interrupt service routine
         enableInterrupt = true;
     }
-}
-
-
-int counter = 0;
-byte arr[63] = {0};
-void loop() {
-    for (int i=0;i<63;i++) { arr[i] = counter; }
-    unsigned long a = micros();
-    transmitData(arr);
-    unsigned long b = micros();
-    if (Serial) { Serial.printf("Transmission took %d (us)\n", b-a); }
-    counter++;
-    delayMicroseconds(10000-(b-a));
 }
