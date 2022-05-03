@@ -35,13 +35,10 @@
 // DIO1 pin:  3
 RFM96 radio = new Module(10, 2, 9, 3);
 void setFlag();
-// or using RadioShield
-// https://github.com/jgromes/RadioShield
-//SX1278 radio = RadioShield.ModuleA;
 
-void setup() {
-    Serial.begin(500000);
 
+
+void RFM96recieveFSKSetup() { // assumes Serial is setup
     // initialize SX1278 with default settings
     Serial.print(F("[RFM96W] Initializing ... "));
     int state = radio.beginFSK(434.0, 300, 100, 250, 17, 8, false);
@@ -80,6 +77,13 @@ void setup() {
     // radio.receive();
     // radio.readData();
     // radio.scanChannel();
+
+}
+
+void setup() {
+    Serial.begin(500000);
+    RFM96recieveFSKSetup();
+
 }
 
 // flag to indicate that a packet was received
@@ -88,94 +92,10 @@ volatile bool receivedFlag = false;
 // disable interrupt when it's not needed
 volatile bool enableInterrupt = true;
 
-// this function is called when a complete packet
-// is received by the module
-// IMPORTANT: this function MUST be 'void' type
-//            and MUST NOT have any arguments!
-#if defined(ESP8266) || defined(ESP32)
-ICACHE_RAM_ATTR
-#endif
-void setFlag() {
-    // check if the interrupt is enabled
-    if(!enableInterrupt) {
-        return;
-    }
 
-    // we got a packet, set the flag
-    receivedFlag = true;
-}
+
 
 void loop() {
-    // check if the flag is set
-    if(receivedFlag) {
-        // disable the interrupt service routine while
-        // processing the data
-        enableInterrupt = false;
 
-        // reset flag
-        receivedFlag = false;
-
-        // you can read received data as an Arduino String
-//        String str;
-//        int state = radio.readData(str);
-
-        // you can also read received data as byte array
-
-        byte byteArr[63];
-        int state = radio.readData(byteArr, 63);
-
-        char str[1024] = "";
-        for (int i=0;i<63;i++) { str[2*i] = (byteArr[i]); str[(2*i) + 1] = ','; }
-
-        if (state == RADIOLIB_ERR_NONE) {
-            // packet was successfully received
-            //Serial.println(F("[RFM96W] Received packet!"));
-
-            // print data of the packet
-            //Serial.print(F("[RFM96W] Data:\t\t\n"));
-            //for (auto x : byteArr) { Serial.print(x); Serial.print(", ");}
-            Serial.println();
-            long a = micros();
-
-            Serial.println(str);
-            long b = micros();
-
-            Serial.print("Serial transmission took ");
-            Serial.println(b-a);
-
-
-//             print RSSI (Received Signal Strength Indicator)
-            Serial.print(F("[RFM96W] RSSI:\t\t"));
-            Serial.print(radio.getRSSI());
-            Serial.println(F(" dBm"));
-
-//             print SNR (Signal-to-Noise Ratio)
-            Serial.print(F("[RFM96W] SNR:\t\t"));
-            Serial.print(radio.getSNR());
-            Serial.println(F(" dB"));
-
-//             print frequency error
-            Serial.print(F("[RFM96W] Frequency error:\t"));
-            Serial.print(radio.getFrequencyError());
-            Serial.println(F(" Hz"));
-
-        } else if (state == RADIOLIB_ERR_CRC_MISMATCH) {
-            // packet was received, but is malformed
-            Serial.println(F("[RFM96W] CRC error!"));
-
-        } else {
-            // some other error occurred
-            Serial.print(F("[RFM96W] Failed, code "));
-            Serial.println(state);
-
-        }
-
-        // put module back to listen mode
-        radio.startReceive();
-
-        // we're ready to receive more packets,
-        // enable interrupt service routine
-        enableInterrupt = true;
-    }
 
 }
