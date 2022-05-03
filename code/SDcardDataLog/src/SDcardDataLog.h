@@ -5,7 +5,7 @@
 #ifndef SDCARDDATALOG_H
 #define SDCARDDATALOG_H
 
-
+#include <Arduino.h>
 #include "SdFat.h"
 #include "RingBuf.h"
 
