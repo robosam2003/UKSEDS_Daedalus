@@ -1,3 +1,41 @@
+#include <TimeLib.h>
+#include <Arduino.h>
+
+
+
+time_t getTeensyTime() {
+    return Teensy3Clock.get();
+}
+
+void rtcSetup()  { // assumes Teensy3Clock is already setup and Serial is running.
+    // set the Time library to use Teensy 3.0's RTC to keep time
+    setSyncProvider(getTeensyTime);
+    Serial.begin(115200);
+    while (!Serial);  // Wait for Arduino Serial Monitor to open
+    delay(100);
+    if (timeStatus()!= timeSet) {
+        Serial.println("Unable to sync with the RTC");
+    } else {
+        Serial.println("RTC has set the system time");
+    }
+    // Usually about 2 seconds difference from compile time to runtime. Set the RTC to + 2 seconds to compensate.
+    setTime(hour(), minute(), second() + 2, day(), month(), year());
+}
+
+void setup()  { // assumes Teensy3Clock is already setup and Serial is running.
+    rtcSetup();
+}
+
+void loop() {
+}
+
+
+
+
+
+
+
+
 /*#include <Arduino.h>
 #include <TinyGPS++.h>
 #include <SoftwareSerial.h>
@@ -95,45 +133,15 @@ void displayInfo()
     {
         Serial.println("Not Available");
     }
-
     Serial.println();
     Serial.println();
     delay(1000);
 }*/
+
+
+
+
 /*
-
-#include <Arduino.h>
-#include <SoftwareSerial.h>
-
-// Choose two Arduino pins to use for software serial
-int RXPin = 7;
-int TXPin = 8;
-
-//Default baud of NEO-6M is 9600
-int GPSBaud = 9600;
-
-// Create a software serial port called "gpsSerial"
-
-
-void setup()
-{
-    delay(5000);
-    pinMode(32, OUTPUT);
-    digitalWrite(32, HIGH);
-    // Start the Arduino hardware serial port at 9600 baud
-    Serial.begin(9600);
-    Serial2.begin(GPSBaud);
-
-    // Start the software serial port at the GPS's default baud
-}
-
-void loop()
-{
-    // Displays information when new sentence is available.
-    while (Serial2.available() > 0)
-        Serial.write(Serial2.read());
-}
-*/
 
 #include <Arduino.h>
 #include <Wire.h>
@@ -161,7 +169,11 @@ void setup() {
         while (1) delay(10);
     }
 
-    /* Default settings from datasheet. */
+
+    */
+/* Default settings from datasheet. *//*
+
+
     bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,Adafruit_BMP280::SAMPLING_X2,Adafruit_BMP280::SAMPLING_X16,Adafruit_BMP280::FILTER_X16,Adafruit_BMP280::STANDBY_MS_500);
 }
 
@@ -175,9 +187,16 @@ void loop() {
     Serial.println(" Pa");
 
     Serial.print(F("Approx altitude = "));
-    Serial.print(bmp.readAltitude(1026));
-    Serial.println(" m");
-
+    float altitude = bmp.readAltitude(1031);
+    byte altitude1 = altitude && (0xFF << 24);
+    byte altitude2 = altitude && (0xFF << 16);
+    byte altitude3 = altitude && (0xFF << 8);
+    byte altitude4 = altitude && (0xFF << 0);
+    Serial.println("m");
+    Serial.println("Ethan is dumb");
     Serial.println();
     delay(10);
+
 }
+*/
+
