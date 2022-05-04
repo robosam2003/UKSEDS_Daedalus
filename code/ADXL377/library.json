@@ -1,0 +1,18 @@
+{
+  "name": "HelloWorld",
+  "version": "1.0.0",
+  "description": "ADXL377 code",
+  "repository":
+  {
+    "type": "git",
+    "url": "https://github.com/robosam2003/code/ADXL377.git"
+  },
+  "authors":
+  [
+    {
+      "name": "robosam2003",
+    }
+  },
+  "frameworks": "arduino",
+  "platforms": "*"
+}
