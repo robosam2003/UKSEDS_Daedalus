@@ -1,0 +1,14 @@
+{
+  "name": "UKSEDS_Daedalus",
+  "description": "Code for the daedalus rocket",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/robosam2003/UKSEDS_Daedalus.git"
+  },
+  "version": "0.1.0",
+  "authors": {
+    "name": "robosam2003",
+  },
+  "frameworks": "arduino",
+  "platforms": "*"
+}
