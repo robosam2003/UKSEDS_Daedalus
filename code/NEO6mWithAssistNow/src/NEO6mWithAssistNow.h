@@ -31,6 +31,7 @@
 /// Change this what Serial port the GPS is connected to
 #define gpsSerial Serial2 // Hardware serial port for GPS
 
+uint64_t getTimestampMillis();
 
 time_t getTeensyTime();
 

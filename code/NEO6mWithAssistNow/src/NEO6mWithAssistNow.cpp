@@ -1,14 +1,51 @@
-//
-// Created by robos on 04/05/2022.
-//
+// Created by Samuel scott (robosam2003) on 30/04/2022
+// This program sets up the neo6m gps and performs assistNow loading.
+/// Datasheet url: https://content.u-blox.com/sites/default/files/products/documents/u-blox6_ReceiverDescrProtSpec_%28GPS.G6-SW-10018%29_Public.pdf
+/// Also see: https://content.u-blox.com/sites/default/files/products/documents/MultiGNSS-Assistance_UserGuide_%28UBX-13004360%29.pdf
+/// little endian format /:)
+
 
 #include "NEO6mWithAssistNow.h"
 
-time_t getTeensyTime() {
+time_t getTeensy3Time()
+{
     return Teensy3Clock.get();
 }
 
-void rtcSetup()  {
+
+uint64_t getTimestampMillis()
+{
+    // Created by Ashley Shaw on 19/04/2022 using stuff from https://forum.pjrc.com/threads/68062-Teensy-4-1-RTC-get-milliseconds-correctly
+    // 2022 TeamSunride.
+    //
+
+    uint64_t periods;
+    uint32_t hi1 = SNVS_HPRTCMR, lo1 = SNVS_HPRTCLR;
+    while (true)
+    {
+        uint32_t hi2 = SNVS_HPRTCMR, lo2 = SNVS_HPRTCLR;
+        if (lo1 == lo2 && hi1 == hi2)
+        {
+            periods = (uint64_t)hi2 << 32 | lo2;
+            break;
+        }
+        hi1 = hi2;
+        lo1 = lo2;
+    }
+    uint32_t ms = (1000 * (periods % 32768)) / 32768;
+    time_t sec = periods / 32768;
+    tm t = *gmtime(&sec);
+
+    setTime(t.tm_hour-1, t.tm_min, t.tm_sec, t.tm_mday, t.tm_mon + 1, t.tm_year + 1900);
+
+    uint64_t unixTime = (uint64_t(now()) * 1000) + ms;
+    return unixTime;
+}
+
+
+
+// rtcSetup has been made redundant by getTimeStampMillis which is much more accurate.
+/*void rtcSetup()  {
     setSyncProvider(getTeensyTime);
     Serial.begin(9600);
     delay(100);
@@ -19,7 +56,7 @@ void rtcSetup()  {
     }
     // Usually about 2 seconds difference from compile time to runtime. Set the RTC to + 2 seconds to compensate.
     setTime(hour()-1, minute(), second() + 2, day(), month(), year()); // we are on bst time rn
-}
+}*/
 
 time_t TimeFromYMD(int year, int month, int day) {
     struct tm tm = {0};
@@ -30,12 +67,20 @@ time_t TimeFromYMD(int year, int month, int day) {
 }
 
 unsigned short GPSweek() {
-    double diff = difftime(TimeFromYMD(year(), month(), day()), TimeFromYMD(1980, 1, 1));
+    // 315964800 is the unix timestamp (s) of 6th Jan 1980 - the start of GPS time |
+    // There has been 18 leap seconds since this date (unix time does not account for leap seconds)
+    // not sure when the next leap second is due
+    u_int64_t diff = (getTimestampMillis()/1000) - 315964800 + 18;
     return (unsigned short) (diff / SECS_PER_WEEK);
 }
 
 unsigned int actualTimeOfWeekms() {
-    return (unsigned int) (1000*((weekday()-1)*SECS_PER_DAY + hour()*SECS_PER_HOUR + minute()*SECS_PER_MIN + second())) +18000;
+    // 315964800000 is the unix timestamp (ms) of 6th Jan 1980 - the start of GPS time |
+    // There has been 18 leap seconds since this date (unix time does not account for leap seconds)
+    // not sure when the next leap second is due
+    u_int64_t diff = (getTimestampMillis()) - 315964800000 + 18000;
+    return (unsigned int) ((diff) % (SECS_PER_WEEK*1000));
+    //return (unsigned int) (1000*((weekday()-1)*SECS_PER_DAY + hour()*SECS_PER_HOUR + minute()*SECS_PER_MIN + second())) +18000;
 }
 
 void serialClear() {
@@ -124,28 +169,15 @@ void getUbx(byte ubxClassID, byte messageID, short payloadLength, byte payload[]
     /// ubxHeader1, ubxHeader2, ubxClassID, messageID, payloadLength, payload, checksumA, checksumB
     // Send the poll request with empty payload to poll.
 
-    Serial.println(gpsSerial.available());
-    while (gpsSerial.available()) { gpsSerial.read(); }// should clear the buffer
-
-    Serial.println(gpsSerial.available());
-    sendUbx(ubxClassID, messageID, 0, payload);
-    Serial.clear();
-    Serial.println(gpsSerial.available());
+    sendUbx(ubxClassID, messageID, 0, nullptr);
 
     // Wait for the response
     while (gpsSerial.available() < (payloadLength + 8));
-    Serial.println("bytes available:");
-    Serial.printf("%d\n", gpsSerial.available());
-
-
-
+    while (gpsSerial.peek() != ubxHeader1) { gpsSerial.read(); } // ensures reading starts from start of ubx packet
     byte buffer[payloadLength + 8];
-    while (gpsSerial.available()) { gpsSerial.readBytes(buffer, payloadLength + 8); }
+    gpsSerial.readBytes(buffer, payloadLength + 8);
 
-    Serial.println("BUFFER");
-    for (int i = 0; i < payloadLength+8; i++) {
-        Serial.printf("%02X ", buffer[i]);
-    }
+
     /// Check the header
     if (buffer[0] != ubxHeader1 || buffer[1] != ubxHeader2) {
         Serial.println("Bad header");
@@ -162,12 +194,16 @@ void getUbx(byte ubxClassID, byte messageID, short payloadLength, byte payload[]
         return;
     }
     /// Check the payload length
-    if (buffer[4] != (payloadLength & 0xFF00) >> 8 || buffer[5] != (payloadLength & 0x00FF)) {
+    if (buffer[5] != (payloadLength & 0xFF00) >> 8 || buffer[4] != (payloadLength & 0x00FF)) { // LITTLE ENDIAN !
         Serial.println("Bad payload length");
         return;
     }
     /// Check the checksum
-    byte ckBuffer[payloadLength + 4]; // includes ubxClassID, messageID, payloadLength, and payload
+    byte * ckBuffer = new byte[payloadLength + 4]; // includes ubxClassID, messageID, payloadLength, and payload
+    for (int i=0;i<payloadLength+4; i++) {
+        ckBuffer[i] = buffer[i+2];
+    }
+
     int n = payloadLength + 4;
     uint8_t CK_A= 0, CK_B = 0;
     for (int i=0;i<n;i++)
@@ -175,17 +211,22 @@ void getUbx(byte ubxClassID, byte messageID, short payloadLength, byte payload[]
         CK_A = CK_A + ckBuffer[i];
         CK_B = CK_B + CK_A;
     }
+
     if (buffer[payloadLength + 6] != CK_A || buffer[payloadLength + 7] != CK_B) {
-        printf("Checksum failed\n");
+        Serial.printf("Checksum failed\n");
         return;
     }
+
     /// Copy the payload
-    for (int i = 0; i < payloadLength; i++) {
-        payload[i] = buffer[i + 6];
+    for (int i = 0; i < payloadLength+8; i++) {
+        payload[i] = buffer[i];
     }
+    delete[] ckBuffer; // Very important
+
 }
 
 int getUbxFromFile(File fptr, byte ubxClassID, byte messageID, short payloadLength, byte payload[]) {
+    // For finding a particular UBX sequence in a file
     fptr.seek(0);
     int fileSize = fptr.size();
     for (int i=0;i<fileSize;i++) {
@@ -242,8 +283,10 @@ void performOnlineAssist() {
     }
     Serial.println("Card initialised");
 
-    // this file ("mgaonline.ubx") should be loaded into the onboard SD card
-    // the generator token can be obtained from thingstream from ublocks
+    /// this file ("mgaonline.ubx") should be loaded into the onboard SD card
+    /// the file should be obtained from the ublocks server
+    /// the generator token for that can be obtained from thingstream from ublocks
+    /// See https://developer.thingstream.io/guides/location-services/assistnow-getting-started-guide for more details
     File dataFile = SD.open("mgaonline.ubx");
     const int numbytes = dataFile.available();
     Serial.printf("File size: %d\n", numbytes);
@@ -251,22 +294,22 @@ void performOnlineAssist() {
         Serial.println("Failed to open file");
         while (true);
     }
-    byte * fileBuffer = new byte[numbytes];
+    byte * fileBuffer = new byte[numbytes]; // use new for array of variable size - remember to delete[] !
     dataFile.readBytes(reinterpret_cast<char *>(fileBuffer), numbytes);
 
     Serial.printf("%d:%d:%d,  %d/%d/%d", hour(), minute(), second(), day(), month(), year());
-    Serial.printf("GPS WEEK: %d\n", GPSweek()-1);
+    Serial.printf("GPS WEEK: %d\n", GPSweek());
     Serial.printf("GPS time of week: %d\n", actualTimeOfWeekms());
 
     // alter the necessary fields in the file buffer AID_INI
 
-    // configure week number, little endian
+    // configure week number, little endian /:)
     int headerLength = 6;
-    unsigned short gpsweek = GPSweek()-1;
+    unsigned short gpsweek = GPSweek();
     fileBuffer[18+headerLength] = (gpsweek & 0x00FF);
     fileBuffer[19+headerLength] = (gpsweek & 0xFF00) >> 8;
 
-    // configure time of week, little endian
+    // configure time of week, little endian /:)
     unsigned long timeOfWeekms = actualTimeOfWeekms();
     fileBuffer[20+headerLength] = (timeOfWeekms & 0x000000FF);
     fileBuffer[21+headerLength] = (timeOfWeekms & 0x0000FF00) >> 8;
@@ -274,6 +317,8 @@ void performOnlineAssist() {
     fileBuffer[23+headerLength] = (timeOfWeekms & 0xFF000000) >> 24; // This doesn't work because we change the checksum ey.
 
     Serial.println("\n\n\n");
+
+    // setting the new checksums
     uint8_t CK_A = 0;
     uint8_t CK_B = 0;
 
@@ -291,12 +336,12 @@ void performOnlineAssist() {
     Serial.printf("\nAvailable for write: %d\n", gpsSerial.availableForWrite());
     for (int  i=0;i<numbytes; i++) {
         gpsSerial.write(fileBuffer[i]);
-        gpsSerial.flush();
+        gpsSerial.flush(); // flush waits for the above write to finish
 
     }
 
     dataFile.close();
-    delete[] fileBuffer;
+    delete[] fileBuffer; // delete[] - very important - we don't like them segfaults
 
     Serial.println("\nFinished performOnlineAssist()\n");
 
@@ -349,18 +394,10 @@ void NEO6mConfig() {
 
 
     ///  As a second step, activate certain messages on each port using CFG_MSG
-    byte CFG_MSG_NAV_POLLSH_payload[8] = {NAV, NAV_POSLLH, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00};
-    sendUbx(CFG, CFG_MSG, 8, CFG_MSG_NAV_POLLSH_payload);
-//    // add nmea sentences:
-//    byte CFG_MSG_GPGSA[8] = {0xF0, 0x02 ,0x00, 0x01, 0x01, 0x00, 0x00, 0x00};
-//    sendUbx(CFG, CFG_MSG, 8, CFG_MSG_GPGSA);
-//
-//    byte CFG_MSG_GPGSV[8] = {0xF0, 0x03 ,0x00, 0x01, 0x01, 0x00, 0x00, 0x00};
-//    sendUbx(CFG, CFG_MSG, 8, CFG_MSG_GPGSV);
+    ///  NOTE: configuring messages in this way sets up "periodic polling" - The GPS will spit out this data very (measrate) milliseconds
 
-//    byte CFG_MSG_GPGAA[8] = {0xF0, 0x00 ,0x00, 0x01, 0x01, 0x00, 0x00, 0x00};
-//    sendUbx(CFG, CFG_MSG, 8, CFG_MSG_GPGAA);
-
+//    byte CFG_MSG_NAV_POLLSH_payload[8] = {NAV, NAV_POSLLH, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00};
+//    sendUbx(CFG, CFG_MSG, 8, CFG_MSG_NAV_POLLSH_payload);
 
 
     byte CFG_CFG_payload[12] = {0,0,0,0, 0x00, 0x00, 0b00000110, 0b00011111, 0,0,0,0};

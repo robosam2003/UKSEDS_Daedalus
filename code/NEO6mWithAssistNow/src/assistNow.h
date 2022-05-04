@@ -36,6 +36,29 @@ enum navID {
     NAV_VELNED = 0x12
 };
 
+enum navIDPayloadLengths {
+    NAV_AOPSTATUS_PAYLOAD_LENGTH = 20,
+    NAV_CLOCK_PAYLOAD_LENGTH = 20,
+    NAV_DGPS_PAYLOAD_LENGTH = 16+12*50, // 16 bytes + 12 bytes per channel - change according to your needs
+    NAV_DOP_PAYLOAD_LENGTH = 18,
+    NAV_EKFSTATUS_PAYLOAD_LENGTH = 36,
+    NAV_POSECEF_PAYLOAD_LENGTH = 20,
+    NAV_POSLLH_PAYLOAD_LENGTH = 28,
+    NAV_SBAS_PAYLOAD_LENGTH = 12+12*1, // 12 bytes + 12 bytes per "cnt" - not sure what "cnt" is - see https://content.u-blox.com/sites/default/files/products/documents/u-blox6_ReceiverDescrProtSpec_%28GPS.G6-SW-10018%29_Public.pdf
+    NAV_SOL_PAYLOAD_LENGTH = 52,
+    NAV_STATUS_PAYLOAD_LENGTH = 16,
+    NAV_SVINFO_PAYLOAD_LENGTH = 8+12*50, // 8 bytes + 12 bytes per channel - change according to your needs
+    NAV_TIMEGPS_PAYLOAD_LENGTH = 16,
+    NAV_TIMEUTC_PAYLOAD_LENGTH = 20,
+    NAV_VELECEF_PAYLOAD_LENGTH = 20,
+    NAV_VELNED_PAYLOAD_LENGTH = 36
+
+
+
+
+
+};
+
 // RXM
 enum rxmID {
     RXM_ALM = 0x30,
