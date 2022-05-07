@@ -12,14 +12,14 @@
 #define WRITE 0b10000000
 #define READ 0b00000000
 #define CS 37
-#define transistorPin 32
+#define lenTransmissionBytes 255
 
-elapsedMicros microTimer;
+extern elapsedMicros microTimer;
 // flag to indicate that a packet was sent
-volatile bool transmittedFlag = false;
+extern volatile bool transmittedFlag;
 
 // disable interrupt when it's not needed
-volatile bool enableInterrupt = true;
+extern volatile bool enableInterrupt;
 
 
 
@@ -28,7 +28,7 @@ volatile bool enableInterrupt = true;
 // DIO0 pin:  2
 // RESET pin: 9
 // DIO1 pin:  3
-RFM96 radio = new Module(CS, 2, 9, 3);
+extern RFM96 radio;
 
 // prototypes
 void setFlag();
@@ -42,7 +42,7 @@ void RFM96WtransmitSetup();
 void transmitData(byte arr[]);
 
 // save transmission state between loops
-int transmissionState = RADIOLIB_ERR_NONE;
+extern int transmissionState;
 
 
 

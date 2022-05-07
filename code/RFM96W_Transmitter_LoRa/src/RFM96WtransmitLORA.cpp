@@ -3,10 +3,19 @@
 //
 #include "RFM96WtransmitLORA.h"
 
+
+
+// init externs
+elapsedMicros microTimer;
+volatile bool transmittedFlag = false;
+volatile bool enableInterrupt = true;
+int transmissionState = RADIOLIB_ERR_NONE;
+RFM96 radio  = new Module(CS, 2, 9, 3);
+
 void RFM96WtransmitSetup() { // assumes serial is setup.
     // initialize SX1278 with default settings
     Serial.print(F("[SX1278] Initializing ... "));
-    int state = radio.begin(434.0, 500, 6, 5, RADIOLIB_SX127X_SYNC_WORD_LORAWAN, 17, 8, 0);
+    int state = radio.begin(434.0, 500, 8, 5, RADIOLIB_SX127X_SYNC_WORD_LORAWAN, 10, 8, 0);
     if (state == RADIOLIB_ERR_NONE) {
         if (Serial) { Serial.println(F("success!"));}
     } else {
@@ -14,23 +23,24 @@ void RFM96WtransmitSetup() { // assumes serial is setup.
         if (Serial) { Serial.println(state);}
         while (true);
     }
-    radio.setDio0Action(setFlag);
-
-    // spreading factor 6
-    radio.setSpreadingFactor(6);
-
-    radio.implicitHeader(255);
-    byte x31Reg = SPIREADREG(0x31, 1);
-    // write to the last 3 bits of register 0x31
-    x31Reg &= 0b11111101;
-    SPIREGSET(0x31, x31Reg);
-
-    SPIREGSET(0x37, 0x0C);
-
-
 
     // set the function that will be called
     // when packet transmission is finished
+    radio.setDio0Action(setFlag); // interrupt on DIO0
+
+    // spreading factor 6
+//    radio.setSpreadingFactor(6);
+//
+//    radio.implicitHeader(255);
+//    byte x31Reg = SPIREADREG(0x31, 1);
+//    // write to the last 3 bits of register 0x31
+//    x31Reg &= 0b11111101;
+//    SPIREGSET(0x31, x31Reg);
+//
+//    SPIREGSET(0x37, 0x0C);
+
+
+
 
 
     // start transmitting the first packet
@@ -56,7 +66,7 @@ int SPIREADREG(byte address, int bytesToRead){  // FIFO
 }
 
 void SPIREGSET(byte address, byte value) {
-    address = WRITE | address; //
+    address = WRITE | address;
     digitalWrite(CS, LOW); // pulls CS low, which begins the transfer
     SPI.transfer(address);
     SPI.transfer(value);
@@ -74,8 +84,6 @@ void setFlag() {
 }
 
 void transmitData(byte arr[]) {
-    // check if the previous transmission finished
-    while (!transmittedFlag);
     if(transmittedFlag) {
         // disable the interrupt service routine while
         // processing the data
@@ -86,7 +94,7 @@ void transmitData(byte arr[]) {
 
         if (transmissionState == RADIOLIB_ERR_NONE) {
             // packet was successfully sent
-            if (Serial) { Serial.println(F("transmission finished!"));}
+            //if (Serial) { Serial.println(F("transmission finished!"));}
 
             // NOTE: when using interrupt-driven transmit method,
             //       it is not possible to automatically measure
@@ -97,31 +105,14 @@ void transmitData(byte arr[]) {
             if (Serial) { Serial.println(transmissionState);}
 
         }
-
-        // NOTE: in FSK mode, SX127x will not automatically
-        //       turn transmitter off after sending a packet
-        //       set mode to standby to ensure we don't jam others
-        //radio.standby()
-
-        // wait a second before transmitting again
-
-        // send another one
-        if (Serial) { Serial.print(F("[RFM96W] Sending another packet ... "));}
-
-        // you can transmit C-string or Arduino string up to
-        // 256 characters long
-        //transmissionState = radio.startTransmit("Hello World! THIS IS SAM");
-
-        // you can also transmit byte array up to 256 bytes long
-
-        byte byteArr[255] = {};
-        for (int i=0; i<255; i++) { byteArr[i] = arr[i]; }
-
-
-        int state = radio.startTransmit(byteArr, 255);
+        // transmit lenTransmissionBytes bytes of data from arr[]
+        int state = radio.startTransmit(arr, lenTransmissionBytes);
 
         // we're ready to send more packets,
         // enable interrupt service routine
         enableInterrupt = true;
+    }
+    else{
+
     }
 }
