@@ -5,6 +5,14 @@
 #include "ADXL377.h"
 
 
+float ADXLscale = 200*9.8; //  (±200g) for ADXL377
+int a = 2;
+SimpleKalmanFilter filteredAccADXL377_X = SimpleKalmanFilter(a, a, 0.01);
+SimpleKalmanFilter filteredAccADXL377_Y = SimpleKalmanFilter(a, a, 0.01);
+SimpleKalmanFilter filteredAccADXL377_Z = SimpleKalmanFilter(a, a, 0.01);
+Vector<double> filteredADXL;
+
+
 float mapf(float x, float in_min, float in_max, float out_min, float out_max) {
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
@@ -17,16 +25,17 @@ void ADXL377Setup () {
 }
 
 
-void getADXL377Acc (Vector<double> returnVect) {
+Vector<double> getADXL377Acc () {
+    Vector<double> acc;
     // Get raw accelerometer data for each axis
     int rawX = analogRead(ADXL377_XPin);
     int rawY = analogRead(ADXL377_YPin);
     int rawZ = analogRead(ADXL377_ZPin);
 
-    returnVect[0] = mapf(rawX, 0, 1023, -ADXLscale, ADXLscale) - 9.579712; // Between 0 and 1023 on 3.3V processor
-    returnVect[1] = mapf(rawY, 0, 1023, -ADXLscale, ADXLscale) - 5.747803;
-    returnVect[2] = mapf(rawZ, 0, 1023, -ADXLscale, ADXLscale)- 21.075317 + 9.81;
-
+    acc[0] = mapf(rawX, 0, 1023, -ADXLscale, ADXLscale) - 9.579712; // Between 0 and 1023 on 3.3V processor
+    acc[1] = mapf(rawY, 0, 1023, -ADXLscale, ADXLscale) - 9.8 + 5.747803;
+    acc[2] = mapf(rawZ, 0, 1023, -ADXLscale, ADXLscale) - 13.411499;
+    return acc;
 }
 
 void updateADXL377Filters(Vector<double> ADXLacc) {
