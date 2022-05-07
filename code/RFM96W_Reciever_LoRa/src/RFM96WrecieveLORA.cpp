@@ -4,11 +4,16 @@
 #include <RFM96WrecieveLORA.h>
 
 
+// init externs
+RFM96 radio = new Module(10, 2, 9, 3);
+volatile bool receivedFlag = false;
+volatile bool enableInterrupt = true;
+byte byteArr[255] = {};
+int state = 0;
 
 void RFM96WrecieveLORASetup() {
-
     Serial.print(F("[RFM96W] Initializing ... "));
-    int state = radio.begin(434.0, 500, 6, 5, RADIOLIB_SX127X_SYNC_WORD_LORAWAN, 17, 8, 0);
+    state = radio.begin(434.0, 500, 8, 5, RADIOLIB_SX127X_SYNC_WORD_LORAWAN, 10, 8, 0);
     if (state == RADIOLIB_ERR_NONE) {
         Serial.println(F("success!"));
     } else {
@@ -21,17 +26,16 @@ void RFM96WrecieveLORASetup() {
     // when new packet is received
     radio.setDio0Action(setFlag);
 
-
-    // spreading factor 6
-    radio.setSpreadingFactor(6);
-
-    radio.implicitHeader(255);
-    byte x31Reg = SPIREADREG(0x31, 1);
-    // write to the last 3 bits of register 0x31
-    x31Reg &= 0b11111101;
-    SPIREGSET(0x31, x31Reg);
-
-    SPIREGSET(0x37, 0x0C);
+//    // spreading factor 6
+//    radio.setSpreadingFactor(6);
+//
+//    radio.implicitHeader(255);
+//    byte x31Reg = SPIREADREG(0x31, 1);
+//    // write to the last 3 bits of register 0x31
+//    x31Reg &= 0b11111101;
+//    SPIREGSET(0x31, x31Reg);
+//
+//    SPIREGSET(0x37, 0x0C);
 
     // start listening for LoRa packets
     Serial.print(F("[RFM96W] Starting to listen ... "));
@@ -43,16 +47,6 @@ void RFM96WrecieveLORASetup() {
         Serial.println(state);
         while (true);
     }
-
-    // if needed, 'listen' mode can be disabled by calling
-    // any of the following methods:
-    //
-    // radio.standby()
-    // radio.sleep()
-    // radio.transmit();
-    // radio.receive();
-    // radio.readData();
-    // radio.scanChannel();
 }
 
 void setFlag() {
@@ -60,7 +54,6 @@ void setFlag() {
     if(!enableInterrupt) {
         return;
     }
-
     // we got a packet, set the flag
     receivedFlag = true;
 }
@@ -75,16 +68,8 @@ void RFM96WrecieveBytesLORA() {
         // reset flag
         receivedFlag = false;
 
-        // you can read received data as an Arduino String
-        //String str;
-        //int state = radio.readData(str);
 
-        // you can also read received data as byte array
-
-
-        state = radio.readData(byteArr, 255);
-
-
+        state = radio.readData(byteArr, lenReceiveBytes);
 
         if (state == RADIOLIB_ERR_NONE) {
             // packet was successfully received
@@ -93,8 +78,6 @@ void RFM96WrecieveBytesLORA() {
             // print data of the packet
             //Serial.print(F("[RFM96W] Data:\t\t\n"));
             //for (auto x : byteArr) { Serial.print(x); Serial.print(", ");}
-            Serial.println();
-            Serial.println(byteArr[50]);
 
             // print RSSI (Received Signal Strength Indicator)
             //Serial.print(F("[RFM96W] RSSI:\t\t"));
@@ -113,13 +96,12 @@ void RFM96WrecieveBytesLORA() {
 
         } else if (state == RADIOLIB_ERR_CRC_MISMATCH) {
             // packet was received, but is malformed
-            Serial.println(F("[RFM96W] CRC error!"));
+            //Serial.println(F("[RFM96W] CRC error!"));
 
         } else {
             // some other error occurred
-            Serial.print(F("[RFM96W] Failed, code "));
-            Serial.println(state);
-
+            //Serial.print(F("[RFM96W] Failed, code "));
+            //Serial.println(state);
         }
 
         // put module back to listen mode
