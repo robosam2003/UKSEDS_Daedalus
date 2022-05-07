@@ -7,6 +7,7 @@
 // include the library
 #include <Arduino.h>
 #include <RadioLib.h>
+#define lenReceiveBytes 255
 
 
 #define WRITE 0b10000000
@@ -18,24 +19,31 @@
 // DIO0 pin:  2
 // RESET pin: 9
 // DIO1 pin:  3
-RFM96 radio = new Module(10, 2, 9, 3);
-
+extern RFM96 radio;
 
 // flag to indicate that a packet was received
-volatile bool receivedFlag = false;
+extern volatile bool receivedFlag;
 
 // disable interrupt when it's not needed
-volatile bool enableInterrupt = true;
+extern volatile bool enableInterrupt;
 
+extern int state;
 
+extern byte byteArr[255];
 // prototypes
 void setFlag();
+
 void SPIREGSET(byte address, byte value);
+
 int SPIREADREG(byte address, int bytesToRead);
-int state;
+
+
 void RFM96WrecieveLORASetup();
+
 void RFM96WrecieveBytesLORA();
-byte byteArr[255];
+
+
+
 
 
 #endif //RFM96WRECIEVELORA_H
