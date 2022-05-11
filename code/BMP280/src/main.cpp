@@ -16,6 +16,6 @@ void loop() {
     Serial.printf("Altitude: %lf\n", returnVect[2]);
 
     Serial.println();
-    delay(500);
+    delay(10);
 
 }
