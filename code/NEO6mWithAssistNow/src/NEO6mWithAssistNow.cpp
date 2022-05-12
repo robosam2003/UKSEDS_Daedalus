@@ -7,11 +7,63 @@
 
 #include "NEO6mWithAssistNow.h"
 
+GPSDataStruct GPSdata = {};
+
+void NEO6mSetup() {
+    getTimestampMillis();
+
+    // turn on the GPS
+    pinMode(transistorPin, OUTPUT);
+    digitalWrite(transistorPin, HIGH);
+    // must delay on first power up, because GPS sends text messages.
+    delay(3000);
+    Serial.begin(9600);
+    gpsSerial.begin(gpsBaudRate);
+    serialClear();
+
+    delay(100);
+
+    NEO6mConfig();
+
+    performOnlineAssist();
+}
+
+void getGPSData() {
+    // get the GPS data and store it in the GPSdata struct
+
+    // Read NAV-POSLLH
+    byte POSLLH[36] = {0};
+    getUbx(NAV, NAV_POSLLH, NAV_POSLLH_PAYLOAD_LENGTH, POSLLH);
+    // parsing the received data
+    GPSdata.towMs = POSLLH[6] | POSLLH[7] << 8 | POSLLH[8] << 16 | POSLLH[9] << 24;
+    GPSdata.lon = ((signed int) (POSLLH[10] | POSLLH[11] << 8 | POSLLH[12] << 16 | POSLLH[13] << 24)) / 10000000.0;
+    GPSdata.lat = ((signed int) (POSLLH[14] | POSLLH[15] << 8 | POSLLH[16] << 16 | POSLLH[17] << 24)) / 10000000.0;
+
+    /// height (below) is the "height above ellipsoid" - it's not anywhere near the mean sea level value so we arent using it.
+    //double height = ((signed int) (POSLLH[18] | POSLLH[19] << 8 | POSLLH[20] << 16 | POSLLH[21] << 24)) / 1000.0;
+
+    GPSdata.alt = ((signed int) (POSLLH[22] | POSLLH[23] << 8 | POSLLH[24] << 16 | POSLLH[25] << 24 )) / 1000.0; // HSML ;)
+    GPSdata.hAcc = POSLLH[26] | POSLLH[27] << 8 | POSLLH[28] << 16 | POSLLH[29] << 24;
+    GPSdata.vAcc = POSLLH[30] | POSLLH[31] << 8 | POSLLH[32] << 16 | POSLLH[33] << 24;
+
+
+/*    Serial.printf("\nTOW:        %d\n", towMs);
+    Serial.printf("Actual TOW: %d\n", actualTimeOfWeekms()); // actual tow and tow from gps are synced
+    Serial.printf("Time %d:%d:%d\n", hour(), minute(), second());
+    Serial.printf("LONG: %lf\n", longitude);
+    Serial.printf("LAT: %lf\n", latitude);
+    Serial.printf("HEIGHT(m): %lf\n", height);
+    Serial.printf("HMSL(m): %lf\n", hMSL);
+    Serial.printf("HACC(m): %d\n", hAcc / 1000);
+    Serial.printf("VACC(m): %d\n", vAcc / 1000);
+
+    Serial.println();*/
+}
+
 time_t getTeensy3Time()
 {
     return Teensy3Clock.get();
 }
-
 
 uint64_t getTimestampMillis()
 {
@@ -41,8 +93,6 @@ uint64_t getTimestampMillis()
     uint64_t unixTime = (uint64_t(now()) * 1000) + ms;
     return unixTime;
 }
-
-
 
 // rtcSetup has been made redundant by getTimeStampMillis which is much more accurate.
 /*void rtcSetup()  {
@@ -265,7 +315,8 @@ int getUbxFromFile(File fptr, byte ubxClassID, byte messageID, short payloadLeng
 }
 
 void performOnlineAssist() {
-    /** ---------AIDING SEQUENCE--------- Datasheet section 13.5 (pg. 34)
+    /** --------- AIDING SEQUENCE--------- Datasheet section 13.5 (pg. 34)
+     *   --- Note that we are altering the AID_INI part of the message and leaving the rest as is. ---
      • Power-up the GPS receiver
      • Send UBX-AID-INI (time, clock and position) message.
      • Send UBX-AID-EPH (ephemeris) message.
@@ -395,11 +446,11 @@ void NEO6mConfig() {
 
     ///  As a second step, activate certain messages on each port using CFG_MSG
     ///  NOTE: configuring messages in this way sets up "periodic polling" - The GPS will spit out this data very (measrate) milliseconds
-
 //    byte CFG_MSG_NAV_POLLSH_payload[8] = {NAV, NAV_POSLLH, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00};
 //    sendUbx(CFG, CFG_MSG, 8, CFG_MSG_NAV_POLLSH_payload);
 
 
+    // set the neo6m config to ubx
     byte CFG_CFG_payload[12] = {0,0,0,0, 0x00, 0x00, 0b00000110, 0b00011111, 0,0,0,0};
     sendUbx(CFG, CFG_CFG, 12, CFG_CFG_payload);
 

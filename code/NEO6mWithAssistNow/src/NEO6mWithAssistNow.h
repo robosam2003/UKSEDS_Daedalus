@@ -31,6 +31,20 @@
 /// Change this what Serial port the GPS is connected to
 #define gpsSerial Serial2 // Hardware serial port for GPS
 
+
+struct GPSDataStruct {
+    unsigned int towMs; // time of week in milliseconds
+    double lat; // latitude in degrees
+    double lon; // longitude in degrees
+    double alt; // HSML (height above mean sea level) in meters
+    signed int hAcc; // horizontal accuracy estimate in mm
+    signed int vAcc; // vertical accuracy estimate in mm
+};
+
+void NEO6mSetup();
+
+void getGPSlatLongAlt(double GPSdata[3]);
+
 uint64_t getTimestampMillis();
 
 time_t getTeensyTime();

@@ -7,72 +7,12 @@
 #include "NEO6mWithAssistNow.h"
 
 void setup() {
-    getTimestampMillis();
+    NEO6mSetup();
 
-    // turn on the GPS
-    pinMode(transistorPin, OUTPUT);
-    digitalWrite(transistorPin, HIGH);
-    delay(3000);
-    Serial.begin(9600);
-    gpsSerial.begin(gpsBaudRate);
-    serialClear();
-
-    delay(100);
-
-    NEO6mConfig();
-
-    performOnlineAssist();
-
-
-    //gpsSerial.clear();
 }
 
 
 void loop() {
-
-
-    for (int i=0;i<100;i++) {
-        // Read NAV-POSLLH
-        byte POSLLH[36] = {0};
-        getUbx(NAV, NAV_POSLLH, NAV_POSLLH_PAYLOAD_LENGTH, POSLLH);
-
-        Serial.printf("\nThis is the buffer from main: \n");
-        for (unsigned char i: POSLLH) {
-            Serial.printf("%02X ", i);
-        }
-
-        // parsing the received data
-        unsigned int towMs = POSLLH[6] | POSLLH[7] << 8 | POSLLH[8] << 16 | POSLLH[9] << 24;
-        double longitude = ((signed int) (POSLLH[10] | POSLLH[11] << 8 | POSLLH[12] << 16 | POSLLH[13] << 24)) / 10000000.0;
-        double latitude = ((signed int) (POSLLH[14] | POSLLH[15] << 8 | POSLLH[16] << 16 | POSLLH[17] << 24)) / 10000000.0;
-        double height = ((signed int) (POSLLH[18] | POSLLH[19] << 8 | POSLLH[20] << 16 | POSLLH[21] << 24)) / 1000.0;
-        double hMSL = POSLLH[22] | POSLLH[23] << 8 | POSLLH[24] << 16 | POSLLH[25] << 24;
-        signed int hAcc = POSLLH[26] | POSLLH[27] << 8 | POSLLH[28] << 16 | POSLLH[29] << 24;
-        signed int vAcc = POSLLH[30] | POSLLH[31] << 8 | POSLLH[32] << 16 | POSLLH[33] << 24;
-        Serial.printf("\nTOW:        %d\n", towMs);
-        Serial.printf("Actual TOW: %d\n", actualTimeOfWeekms()); // actual tow and tow from gps are synced
-        Serial.printf("Time %d:%d:%d\n", hour(), minute(), second());
-        Serial.printf("LONG: %lf\n", longitude);
-        Serial.printf("LAT: %lf\n", latitude);
-        Serial.printf("HEIGHT(m): %lf\n", height);
-        Serial.printf("HMSL(m): %lf\n", hMSL);
-        Serial.printf("HACC(m): %d\n", hAcc / 1000);
-        Serial.printf("VACC(m): %d\n", vAcc / 1000);
-
-        Serial.println();
-    }
-    Serial.printf("TURNING GPS OFF\n");
-    digitalWrite(transistorPin, LOW);
-    delay(5000);
-    Serial.printf("TURNING GPS ON\n");
-    digitalWrite(transistorPin, HIGH);
-//    uint64_t unixTime = getTimestampMillis();
-//    Serial.println(unixTime);
-//    Serial.printf("%d:%d:%d \n", hour(), minute(), second());
-//    Serial.printf("%d, %d\n", GPSweek(), actualTimeOfWeekms());
-//    delay(1000);
-
-
 
 }
 
