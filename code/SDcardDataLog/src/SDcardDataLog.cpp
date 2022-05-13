@@ -4,13 +4,11 @@
 
 #include "SDcardDataLog.h"
 
+SdFs sd;
+FsFile file;
+RingBuf<FsFile, RING_BUF_CAPACITY> rb;
+SDDataLogStruct SDDataLog;
 
-struct dataStruct { // This can be of any size, up to 512 bytes.
-    uint16_t acc_rawx;
-    uint16_t acc_rawy;
-    uint16_t acc_rawz;
-    byte arr[464];
-};
 
 void sdSetup() {
     // Initialize the SD.
@@ -25,21 +23,22 @@ void sdSetup() {
     // File must be pre-allocated to avoid huge
     // delays searching for free clusters.
     if (!file.preAllocate(LOG_FILE_SIZE)) { // if i dont preallocate, it takes much longer.
-        Serial.println("preAllocate failed\n");
         file.close();
-        return;
+        while(1) {
+            Serial.println("PREALLOCATE FAILED");
+            delay(10);
+        }
     }
     // initialize the RingBuf.
     rb.begin(&file);
+
 }
 
-void logData(byte arr[256]) { // can log up to 512 bytes
+void logData() { // can log up to 512 bytes
     // Max RingBuf used bytes. Useful to understand RingBuf overrun.
     size_t maxUsed = 0;
-
     // Min spare micros in loop.
     int32_t minSpareMicros = INT32_MAX;
-
     // Start time.
     uint32_t logTime = micros();
     // Log data until Serial input or file full.
@@ -64,10 +63,17 @@ void logData(byte arr[256]) { // can log up to 512 bytes
         }
 
     }
-
-
-    rb.printf("%d,%d,%d,", arr[0], arr[1], arr[2]);
-    for (int i=0;i<100;i++) { rb.printf("%d,", arr[i]); }
+    // 31 data points per line. - all doubles.
+    rb.printf("%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf",
+              SDDataLog.timeStamp,
+              SDDataLog.BNO055_acc_x, SDDataLog.BNO055_acc_y, SDDataLog.BNO055_acc_z,
+              SDDataLog.BNO055_gyr_x, SDDataLog.BNO055_gyr_y, SDDataLog.BNO055_gyr_z,
+              SDDataLog.BNO055_acc_x_filt, SDDataLog.BNO055_acc_y_filt, SDDataLog.BNO055_acc_z_filt,
+              SDDataLog.BNO055_gyr_x_filt, SDDataLog.BNO055_gyr_y_filt, SDDataLog.BNO055_gyr_z_filt,
+              SDDataLog.ADXL_acc_x, SDDataLog.ADXL_acc_y, SDDataLog.ADXL_acc_z,
+              SDDataLog.BMP280_temp, SDDataLog.BMP280_pres, SDDataLog.BMP280_alt,
+              SDDataLog.GPS_lat, SDDataLog.GPS_lon, SDDataLog.GPS_alt, SDDataLog.GPS_tow, SDDataLog.GPS_hacc, SDDataLog.GPS_vacc,
+              SDDataLog.DR_pos_x, SDDataLog.DR_pos_y, SDDataLog.DR_pos_z, SDDataLog.DR_vel_x, SDDataLog.DR_vel_y, SDDataLog.DR_vel_z);
     rb.println();
     // Print adc into RingBuf.
     if (rb.getWriteError()) {

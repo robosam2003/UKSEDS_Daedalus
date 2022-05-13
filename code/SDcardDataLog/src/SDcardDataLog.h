@@ -15,19 +15,75 @@
 // Interval between points for 25 ksps.
 //#define LOG_INTERVAL_USEC 40
 
-#define LOG_FILE_SIZE 10*25000*600  // 150,000,000 bytes. // TODO: determine the minumum file size for our rocket
+#define LOG_FILE_SIZE 256*100*60*40  // 61,440,000 bytes - 61MB - This gives us over 40 minutes of data
 
 // Space to hold more than 800 ms of data for 10 byte lines at 25 ksps.
 #define RING_BUF_CAPACITY 400*512
 
-#define LOG_FILENAME "SdioLogger10mychanges.csv" // csv is far easier than other formats.
+#define LOG_FILENAME "daedalusDataLog.csv" // csv is far easier than other formats.
 
-SdFs sd;
-FsFile file;
+extern SdFs sd;
+extern FsFile file;
 
 // RingBuf for File type FsFile.
-RingBuf<FsFile, RING_BUF_CAPACITY> rb;
+extern RingBuf<FsFile, RING_BUF_CAPACITY> rb;
 
-struct dataStruct;
+
+
+struct SDDataLogStruct { // This is the structure that will be written to each line of the file.
+
+    double timeStamp;
+    /** BNO055 **/
+    // Raw, un-biased, unfiltered sensor data especially for Tom.
+    double BNO055_acc_x;
+    double BNO055_acc_y;
+    double BNO055_acc_z;
+    double BNO055_gyr_x;
+    double BNO055_gyr_y;
+    double BNO055_gyr_z;
+
+    // Filtered, bias corrected sensor data.
+    double BNO055_acc_x_filt;
+    double BNO055_acc_y_filt;
+    double BNO055_acc_z_filt;
+    double BNO055_gyr_x_filt;
+    double BNO055_gyr_y_filt;
+    double BNO055_gyr_z_filt;
+
+    /** ADXL377 **/
+    // Raw filtered data.
+    double ADXL_acc_x;
+    double ADXL_acc_y;
+    double ADXL_acc_z;
+
+    /** BMP280 **/
+    double BMP280_temp;
+    double BMP280_pres;
+    double BMP280_alt;
+
+    /** NEO6M **/
+    double GPS_lat;
+    double GPS_lon;
+    double GPS_alt;
+    double GPS_tow;
+    double GPS_hacc;
+    double GPS_vacc;
+
+    /** Dead reckoning **/
+    double DR_pos_x;
+    double DR_pos_y;
+    double DR_pos_z;
+
+    double DR_vel_x;
+    double DR_vel_y;
+    double DR_vel_z;
+};
+
+extern SDDataLogStruct SDDataLog;
+
+
+void sdSetup();
+
+void logData();
 
 #endif //SDCARDDATALOG_H
