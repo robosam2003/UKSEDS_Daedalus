@@ -20,7 +20,7 @@
 // Space to hold more than 800 ms of data for 10 byte lines at 25 ksps.
 #define RING_BUF_CAPACITY 400*512
 
-#define LOG_FILENAME "daedalusDataLog.csv" // csv is far easier than other formats.
+#define LOG_FILENAME "daedalusDataLog2.csv" // csv is far easier than other formats.
 
 extern SdFs sd;
 extern FsFile file;
@@ -32,7 +32,7 @@ extern RingBuf<FsFile, RING_BUF_CAPACITY> rb;
 
 struct SDDataLogStruct { // This is the structure that will be written to each line of the file.
 
-    double timeStamp;
+    u_int64_t timeStamp;
     /** BNO055 **/
     // Raw, un-biased, unfiltered sensor data especially for Tom.
     double BNO055_acc_x;
