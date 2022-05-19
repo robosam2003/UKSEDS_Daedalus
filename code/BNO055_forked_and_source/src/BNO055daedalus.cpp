@@ -5,7 +5,37 @@
 #include "BNO055daedalus.h"
 
 
-void updateFilters(Vector<double> gyro, Vector<double> acc){ // TODO: Add any other data points you want filtered
+/// Global variable definitions:
+const byte BNO055_I2C_ADDRESS = 0x28;
+Vector<double> acc_biases = {0,0,0}; // biases for the accelerometers and gyros
+Vector<double> gyr_biases = {0,0,0};
+BNO055 sensor(BNO055_I2C_ADDRESS, &Wire);
+
+double prevVect[numDR][9] = {}; /// Holds previous values of (true acceleration), velocity and omega (from gyro)
+Vector<double> omegaAverage = {0,0,0}; // live bias calculations
+Vector<double> accAverage = {0,0,0};
+double biasAverageOmegaThreshold = 0.3;
+double biasAverageAccThreshold = 0.3;
+
+Vector<double> pos = {0}; // For dead reckoning purposes.
+Vector<double> vel = {0};
+Vector<double> ori = {0};
+int DRcounter = 0;
+
+SimpleKalmanFilter filteredAccBNO055X = SimpleKalmanFilter(0.05, 0.05, 0.01);
+SimpleKalmanFilter filteredAccBNO055Y = SimpleKalmanFilter(0.05, 0.05, 0.01);
+SimpleKalmanFilter filteredAccBNO055Z = SimpleKalmanFilter(0.05, 0.05, 0.01);
+
+SimpleKalmanFilter filteredGyroX = SimpleKalmanFilter(0.05, 0.05, 0.01);
+SimpleKalmanFilter filteredGyroY = SimpleKalmanFilter(0.05, 0.05, 0.01);
+SimpleKalmanFilter filteredGyroZ = SimpleKalmanFilter(0.05, 0.05, 0.01);
+
+Vector<double> filteredAccBNO055;
+Vector<double> filteredGyro;
+Vector<double> trueAccVect;
+
+
+void updateBNOFilters(Vector<double> gyro, Vector<double> acc){ // Update the filters with the latest measurements
     filteredAccBNO055[0] = filteredAccBNO055X.updateEstimate( static_cast<float>(acc[0]) );
     filteredAccBNO055[1] = filteredAccBNO055Y.updateEstimate( static_cast<float>(acc[1]) );
     filteredAccBNO055[2] = filteredAccBNO055Z.updateEstimate( static_cast<float>(acc[2]) );
@@ -196,7 +226,7 @@ Vector<double> find_gyr_biases() {
         Vector<double> BNO055accRaw = data.accel;
         Vector<double> magRaw = data.mag;
         Vector<double> gyrVect = data.gyro;
-        updateFilters(gyrVect, {0,0,0});
+        updateBNOFilters(gyrVect, {0,0,0});
         gyr_biases_x[counter % num] = filteredGyro[0];
         gyr_biases_y[counter % num] = filteredGyro[1];
         gyr_biases_z[counter % num] = filteredGyro[2];
@@ -292,40 +322,48 @@ void getInitialOrientation() {
 
 }
 
-void deadReckoning(Vector<double> acc, Vector<double> omega, int updateTimeUs, double prevValues[numDR][9]) {
+void deadReckoning(Vector<double> acc, Vector<double> omega, int updateTimeUs) {
     /// omega (angular velocity) is pulled directly from a filtered gyro estimate.\n
-    /// acc is the acceleration pulled straight from the accelerometers, conversion is done internally.
+    /// acc is the filtered acceleration pulled straight from the accelerometers, conversion is done internally.
 
-    for (int i=0;i<3;i++) {
-        /// Integration of angular velocity, to get orientationFirst order hold (trapezium rule)\n
-        /// If the filtered gyro value is within the range of +- 0.5 dps (due to noise) it is deemed insignificant
-        (abs(omega[i]) > 0) ? ori[i] += (updateTimeUs * 0.000001) * 0.5 * (omega[i] + prevValues[DRcounter % numDR][6 + i]) : ori[i] += 0;
-        prevValues[DRcounter % numDR][6+i] = omega[i]; // setting previous value of omega for next time.
+    for (int i = 0; i < 3; i++) {
+        /// Integration of angular velocity, to get orientation\n
+        /// First order hold (trapezium rule)\n
+        (abs(omega[i]) > 0) ? ori[i] += (updateTimeUs * 0.000001) * 0.5 *
+                                        (omega[i] + prevVect[DRcounter % numDR][6 + i]) : ori[i] += 0;
+        prevVect[DRcounter % numDR][6 + i] = omega[i]; // setting previous value of omega for next time.
     }
-    trueAccVect = {0,0,0};
+    trueAccVect = {0, 0, 0};
     calcRotationVect(acc, ori, trueAccVect);
-    trueAccVect[2] -= 9.81;
-    for(int i=0;i<3;i++) {
+    // TODO: add a !launched condition to the following
+    //trueAccVect[2] -= 9.81;
+
+
+    for (int i = 0; i < 3; i++) {
         /// Velocity calculation, First order hold.\n
-        /// If the true acceleration value is within the range of +- 0.1 (due to noise) it is deemed insignificant
         if (abs(trueAccVect[i]) > 0) {
-            vel[i] += (updateTimeUs*0.000001)*0.5*(trueAccVect[i] + prevValues[DRcounter % numDR][i]);
+            vel[i] += (updateTimeUs * 0.000001) * 0.5 * (trueAccVect[i] + prevVect[DRcounter % numDR][i]);
         }
-        prevValues[DRcounter % numDR][i] = trueAccVect[i]; // setting previous value of true acceleration for next time
-        /// Position calculation, First order hold
-        /// If the value is within the range of +- 0.1 (due to noise) it is deemed insignificant
-        if ( abs(prevValues[DRcounter % numDR][3+i]) != abs(vel[i]) ) {
-            pos[i] +=  (updateTimeUs*0.000001)*0.5*(vel[i] + prevValues[DRcounter % numDR][3+i]);
+        prevVect[DRcounter % numDR][i] = trueAccVect[i]; // setting previous value of true acceleration for next time
+        /// Position calculation, First order hold \n
+        if (abs(prevVect[DRcounter % numDR][3 + i]) != abs(vel[i])) {
+            pos[i] += (updateTimeUs * 0.000001) * 0.5 * (vel[i] + prevVect[DRcounter % numDR][3 + i]);
         }
-        prevValues[DRcounter % numDR][3+i] = static_cast<double>(vel[i]); // setting previous value of velocity for next time.
+        prevVect[DRcounter % numDR][3 +
+                                      i] = static_cast<double>(vel[i]); // setting previous value of velocity for next time.
     }
+
+}
+
+void liveBiasEstimation() {
+    /// This should be performed continuously, before launch.
 
 
     /// Live Accelerometer and gyroscope bias estimation\n
     if (DRcounter < numDR) {
         for (int j=0;j<3;j++) {
-            omegaAverage[j] = (omegaAverage[j]*DRcounter + prevValues[DRcounter][6+j]) / (DRcounter+1);
-            accAverage[j] = (accAverage[j]*DRcounter + prevValues[DRcounter][j]) / (DRcounter + 1);
+            omegaAverage[j] = (omegaAverage[j]*DRcounter + prevVect[DRcounter][6+j]) / (DRcounter+1);
+            accAverage[j] = (accAverage[j]*DRcounter + prevVect[DRcounter][j]) / (DRcounter + 1);
             Serial.printf("THE AVERAGE HERE IS: %lf, %lf\n" , omegaAverage[j], accAverage[j]);
         }
         Serial.printf("THE AVERAGE HERE IS: %lf, %lf\n" , omegaAverage, accAverage);
@@ -334,16 +372,16 @@ void deadReckoning(Vector<double> acc, Vector<double> omega, int updateTimeUs, d
 
     else {
         for (int j=0;j<3;j++) {
-            omegaAverage[j] = (omegaAverage[j]*numDR + prevValues[DRcounter % numDR][6+j]) / (numDR + 1);
-            accAverage[j] = (accAverage[j] * numDR + prevValues[DRcounter % numDR][j]) / (numDR + 1);
+            omegaAverage[j] = (omegaAverage[j]*numDR + prevVect[DRcounter % numDR][6+j]) / (numDR + 1);
+            accAverage[j] = (accAverage[j] * numDR + prevVect[DRcounter % numDR][j]) / (numDR + 1);
         }
         bool withinRangeOmega[3] = {true, true, true};
         bool withinRangeAcc[3] = {true, true, true};
 
         for (int i = 0; i<numDR; i++) { // checking if the average values are within a specified range - i.e, the data is all noise, not actual acceleration.
             for (int j = 0; j < 3; j++) {
-                if (abs(prevValues[i][6+j] - omegaAverage[j]) > biasAverageOmegaThreshold) { withinRangeOmega[j] = false; }
-                if (abs(prevValues[i][j] - accAverage[i]) > biasAverageAccThreshold) { withinRangeAcc[j] = false; }
+                if (abs(prevVect[i][6+j] - omegaAverage[j]) > biasAverageOmegaThreshold) { withinRangeOmega[j] = false; }
+                if (abs(prevVect[i][j] - accAverage[i]) > biasAverageAccThreshold) { withinRangeAcc[j] = false; }
             }
         }
 
@@ -384,11 +422,13 @@ void interruptCallback() {
 }
 
 void BNO055Setup() {
+    Wire.setClock(1000000);  // i2c seems to work great at 1Mhz
+    Wire.begin();
+    pinMode(13, OUTPUT);
+
     sensor.begin();
     sensor.setPowerMode(NORMAL);
     sensor.setOperationMode(CONFIGMODE); // registers must be configured in config mode
-
-
     sensor.writeRegister(BNO055_UNIT_SEL, 0b00000000); // Celsius, degrees, dps, m/s^2
     sensor.setGyroscopeOperationMode(0b00000000); // Normal mode : 0bxxxxx000
     sensor.setMagnetometerConfig(0b00011111);

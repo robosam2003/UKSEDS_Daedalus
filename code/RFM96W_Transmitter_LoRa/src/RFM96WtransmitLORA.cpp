@@ -48,7 +48,8 @@ void RFM96WtransmitSetup() { // assumes serial is setup.
 
     // you can transmit C-string or Arduino string up to
     // 256 characters long
-    transmissionState = radio.startTransmit("Hello World!");
+    char str[] = {0,0,0,0,0,0,0,0};
+    transmissionState = radio.startTransmit(str);
 }
 
 int SPIREADREG(byte address, int bytesToRead){  // FIFO
@@ -84,6 +85,9 @@ void setFlag() {
 }
 
 void transmitData(byte arr[]) {
+    // This should be called after checking that transmittedFlag is true
+
+
     if(transmittedFlag) {
         // disable the interrupt service routine while
         // processing the data
@@ -105,7 +109,7 @@ void transmitData(byte arr[]) {
             if (Serial) { Serial.println(transmissionState);}
 
         }
-        // transmit lenTransmissionBytes bytes of data from arr[]
+        /// transmit lenTransmissionBytes bytes of data from arr[]
         int state = radio.startTransmit(arr, lenTransmissionBytes);
 
         // we're ready to send more packets,

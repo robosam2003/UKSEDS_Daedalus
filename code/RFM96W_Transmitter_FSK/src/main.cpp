@@ -15,7 +15,7 @@ int transmissionState = RADIOLIB_ERR_NONE;
 
 void RFM96WtransmitFSKsetup() { // assumes serial is setup
     Serial.print(F("[SX1278] Initializing ... "));
-    int state = radio.beginFSK(434.0, 300, 100, 250, 17, 8, false);
+    int state = radio.beginFSK(434.0, 300, 100, 250, 10, 8, false);
     uint8_t syncWord[] = {0x01, 0x23, 0x45, 0x67,
                           0x89, 0xAB, 0xCD, 0xEF};
     state = radio.setSyncWord(syncWord, 8);

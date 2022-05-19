@@ -1,18 +1,9 @@
 #include "C:\Users\robos\CLionProjects\UKSEDS_Daedalus\code\ADXL377\src\ADXL377.h"
-#include "C:\Users\robos\CLionProjects\UKSEDS_Daedalus\code\BNO055_forked_and_source\include\BNO055daedalus.h"
+#include "C:\Users\robos\CLionProjects\UKSEDS_Daedalus\code\BNO055_forked_and_source\src\BNO055daedalus.h"
 #include "C:\Users\robos\CLionProjects\UKSEDS_Daedalus\code\SDcardDataLog\src\SDcardDataLog.h"
 #include "C:\Users\robos\CLionProjects\UKSEDS_Daedalus\code\NEO6mWithAssistNow\src\NEO6mWithAssistNow.h"
 #include "C:\Users\robos\CLionProjects\UKSEDS_Daedalus\code\RFM96W_Transmitter_LoRa\src\RFM96WtransmitLORA.h"
 #include "C:\Users\robos\CLionProjects\UKSEDS_Daedalus\code\BMP280\src\BMP280.h"
-
-
-/*#include "Wire.h"
-#include "SPI.h"
-#include "SdFat.h"
-#include "SD.h"
-#include "TimeLib.h"
-#include "Adafruit_Sensor.h"
-#include "Adafruit_I2CDevice.h"*/
 
 
 /** Global variables defined in other files:
@@ -60,24 +51,49 @@
  *
  */
 
+void enterToContinue(){
+    Serial.printf("Press Enter to continue");
+    while (!Serial.available());
+    Serial.clear();
+}
+
 void fullSystemTest() {
     // Tests each subsystem for several seconds.
-    Serial.printf("Starting full system test...\n\n");
+    Serial.printf("---------- FULL SYSTEM TEST ----------\n\nPress enter to continue");
+    enterToContinue();
 
     Serial.printf("Timestamp test...\n");
+    delay(500);
     for (int i=0; i<100; i++) {
         uint64_t ts = getTimestampMillis();
         Serial.printf("UNIX TIME: %llu\n", ts);
         delay(100);
     }
-    // press enter to continue
-    while (!Serial.available());
-    Serial.printf("YOU PRESSED ENTER\n\n");
+    Serial.printf("Timestamp test complete.\nPress enter to continue.");
+    enterToContinue();
 
     Serial.printf("Testing BNO055 for 15 Seconds... \n");
+    delay(500);
     for (int i=0; i<15*100; i++) {
         bno055_burst_t burst = sensor.getAllData();
-        Serial.printf("BNO055 acc x: %lf\n", burst.accel.getX());
+        Vector<double>rawBNO055Acc = burst.accel;
+        Vector<double>rawBNO055Gyro = burst.gyro;
+        updateBNOFilters(rawBNO055Gyro, rawBNO055Acc);
+        Serial.printf("BNO055 RAW - acc: (x, y, z) %lf, %lf, %lf     gyro : (x, y, z) %lf, %lf, %lf\n",
+                      rawBNO055Acc[0], rawBNO055Acc[1], rawBNO055Acc[2],
+                      rawBNO055Gyro[0], rawBNO055Gyro[1], rawBNO055Gyro[2]);
+        delay(10);
+    }
+    Serial.printf("BNO055 test complete.\nPress enter to continue.");
+    enterToContinue();
+
+    Serial.printf("Testing ADXL377 for 15 Seconds... \n");
+    delay(500);
+    for (int i=0; i<15*100; i++) {
+        Vector<double> rawADXLacc = getADXL377Acc();
+        updateADXL377Filters(rawADXLacc);
+        Serial.printf("ADXL377 RAW - acc: (x, y, z) %lf, %lf, %lf\n",
+                      rawADXLacc[0], rawADXLacc[1], rawADXLacc[2]);
         delay(10);
     }
 }
@@ -92,11 +108,8 @@ void setup() {
      *  - BMP280
      *  - GPS  */
     BNO055Setup();
-
-    //ADXL377Setup();
-
-    //BMP280Setup();
-
+    ADXL377Setup();
+    BMP280Setup();
     //NEO6mSetup();
 
     // * Initialise SD card and transmitter
