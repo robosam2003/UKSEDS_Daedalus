@@ -8,7 +8,7 @@
 RFM96 radio = new Module(10, 2, 9, 3);
 volatile bool receivedFlag = false;
 volatile bool enableInterrupt = true;
-byte byteArr[255] = {};
+byte byteArr[22] = {};
 int state = 0;
 
 void RFM96WrecieveLORASetup() {

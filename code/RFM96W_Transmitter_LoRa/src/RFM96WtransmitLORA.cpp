@@ -12,46 +12,6 @@ volatile bool enableInterrupt = true;
 int transmissionState = RADIOLIB_ERR_NONE;
 RFM96 radio  = new Module(CS, 2, 9, 3);
 
-void RFM96WtransmitSetup() { // assumes serial is setup.
-    // initialize SX1278 with default settings
-    Serial.print(F("[SX1278] Initializing ... "));
-    int state = radio.begin(434.0, 500, 8, 5, RADIOLIB_SX127X_SYNC_WORD_LORAWAN, 10, 8, 0);
-    if (state == RADIOLIB_ERR_NONE) {
-        if (Serial) { Serial.println(F("success!"));}
-    } else {
-        if (Serial) { Serial.print(F("failed, code "));}
-        if (Serial) { Serial.println(state);}
-        while (true);
-    }
-
-    // set the function that will be called
-    // when packet transmission is finished
-    radio.setDio0Action(setFlag); // interrupt on DIO0
-
-    // spreading factor 6
-//    radio.setSpreadingFactor(6);
-//
-//    radio.implicitHeader(255);
-//    byte x31Reg = SPIREADREG(0x31, 1);
-//    // write to the last 3 bits of register 0x31
-//    x31Reg &= 0b11111101;
-//    SPIREGSET(0x31, x31Reg);
-//
-//    SPIREGSET(0x37, 0x0C);
-
-
-
-
-
-    // start transmitting the first packet
-    if (Serial) { Serial.print(F("[RFM96W] Sending first packet ... ")); }
-
-    // you can transmit C-string or Arduino string up to
-    // 256 characters long
-    char str[] = {0,0,0,0,0,0,0,0};
-    transmissionState = radio.startTransmit(str);
-}
-
 int SPIREADREG(byte address, int bytesToRead){  // FIFO
     address = READ | address; // puts 0 int the 8th bit.
     byte inByte = 0;
@@ -119,4 +79,42 @@ void transmitData(byte arr[]) {
     else{
 
     }
+}
+
+
+void RFM96WtransmitSetup() { // assumes serial is setup.
+    // initialize SX1278 with default settings
+    Serial.print(F("[SX1278] Initializing ... "));
+    int state = radio.begin(434.0, 500, 8, 5, RADIOLIB_SX127X_SYNC_WORD_LORAWAN, 10, 8, 0);
+    if (state == RADIOLIB_ERR_NONE) {
+        if (Serial) { Serial.println(F("success!"));}
+    } else {
+        if (Serial) { Serial.print(F("failed, code "));}
+        if (Serial) { Serial.println(state);}
+        while (true);
+    }
+
+    // set the function that will be called
+    // when packet transmission is finished
+    radio.setDio0Action(setFlag); // interrupt on DIO0
+
+    // spreading factor 6
+//    radio.setSpreadingFactor(6);
+//
+//    radio.implicitHeader(255);
+//    byte x31Reg = SPIREADREG(0x31, 1);
+//    // write to the last 3 bits of register 0x31
+//    x31Reg &= 0b11111101;
+//    SPIREGSET(0x31, x31Reg);
+//
+//    SPIREGSET(0x37, 0x0C);
+
+
+
+
+
+    // start transmitting the first packet
+    if (Serial) { Serial.print(F("[RFM96W] Sending first packet ... ")); }
+    char str[] = {0,0,0,0,0,0,0,0};
+    transmissionState = radio.startTransmit(str);
 }

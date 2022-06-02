@@ -17,12 +17,14 @@ void sdSetup() {
     }
     // Open or create file - truncate existing file.
     if (!file.open(LOG_FILENAME, O_RDWR | O_CREAT | O_TRUNC)) {
-        Serial.println("open failed\n");
-        return;
+        while(1) {
+            Serial.println("LOG_FILENAME open failed\n");
+            delay(10);
+        }
     }
     // File must be pre-allocated to avoid huge
     // delays searching for free clusters.
-    if (!file.preAllocate(LOG_FILE_SIZE)) { // if i dont preallocate, it takes much longer.
+    if (!file.preAllocate(LOG_FILE_SIZE)) { // if i dont preallocate, it takes much longer to write to the file
         file.close();
         while(1) {
             Serial.println("PREALLOCATE FAILED");
@@ -63,8 +65,9 @@ void logData() { // can log up to 512 bytes
         }
 
     }
-    // 31 data points per line. - all doubles.
-    rb.printf("%llu,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf",
+    // 35 data points per line.
+    rb.printf("%X,%llu,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf",
+              SDDataLog.logCode,
               SDDataLog.timeStamp,
               SDDataLog.BNO055_acc_x, SDDataLog.BNO055_acc_y, SDDataLog.BNO055_acc_z,
               SDDataLog.BNO055_gyr_x, SDDataLog.BNO055_gyr_y, SDDataLog.BNO055_gyr_z,
@@ -73,7 +76,8 @@ void logData() { // can log up to 512 bytes
               SDDataLog.ADXL_acc_x, SDDataLog.ADXL_acc_y, SDDataLog.ADXL_acc_z,
               SDDataLog.BMP280_temp, SDDataLog.BMP280_pres, SDDataLog.BMP280_alt,
               SDDataLog.GPS_lat, SDDataLog.GPS_lon, SDDataLog.GPS_alt, SDDataLog.GPS_tow, SDDataLog.GPS_hacc, SDDataLog.GPS_vacc,
-              SDDataLog.DR_pos_x, SDDataLog.DR_pos_y, SDDataLog.DR_pos_z, SDDataLog.DR_vel_x, SDDataLog.DR_vel_y, SDDataLog.DR_vel_z);
+              SDDataLog.DR_pos_x, SDDataLog.DR_pos_y, SDDataLog.DR_pos_z, SDDataLog.DR_vel_x, SDDataLog.DR_vel_y, SDDataLog.DR_vel_z,
+              SDDataLog.DR_ori_x, SDDataLog.DR_ori_y, SDDataLog.DR_ori_z);
     rb.println();
     // Print adc into RingBuf.
     if (rb.getWriteError()) {

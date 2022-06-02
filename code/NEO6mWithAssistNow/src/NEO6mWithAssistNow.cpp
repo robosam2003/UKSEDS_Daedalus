@@ -117,7 +117,7 @@ time_t TimeFromYMD(int year, int month, int day) {
 }
 
 unsigned short GPSweek() {
-    // 315964800 is the unix timestamp (s) of 6th Jan 1980 - the start of GPS time |
+    // 315964800 is the unix timestamp (s) of midnight 6th Jan 1980 - the start of GPS time |
     // There has been 18 leap seconds since this date (unix time does not account for leap seconds)
     // not sure when the next leap second is due
     u_int64_t diff = (getTimestampMillis()/1000) - 315964800 + 18;

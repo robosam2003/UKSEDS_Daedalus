@@ -12,7 +12,7 @@
 #define WRITE 0b10000000
 #define READ 0b00000000
 #define CS 37
-#define lenTransmissionBytes 246
+#define lenTransmissionBytes 22
 
 extern elapsedMicros microTimer;
 // flag to indicate that a packet was sent

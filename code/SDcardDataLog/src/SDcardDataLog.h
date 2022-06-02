@@ -15,7 +15,7 @@
 // Interval between points for 25 ksps.
 //#define LOG_INTERVAL_USEC 40
 
-#define LOG_FILE_SIZE 256*100*60*40  // 61,440,000 bytes - 61MB - This gives us over 40 minutes of data
+#define LOG_FILE_SIZE 256*100*60*40  // 61,440,000 bytes - 61MB - This gives us over 40 minutes of data logging
 
 // Space to hold more than 800 ms of data for 10 byte lines at 25 ksps.
 #define RING_BUF_CAPACITY 400*512
@@ -31,10 +31,10 @@ extern RingBuf<FsFile, RING_BUF_CAPACITY> rb;
 
 
 struct SDDataLogStruct { // This is the structure that will be written to each line of the file.
-
+    byte logCode;
     u_int64_t timeStamp;
     /** BNO055 **/
-    // Raw, un-biased, unfiltered sensor data especially for Tom.
+    // Raw, (NOT bias corrected) filtered sensor data especially for Tom.
     double BNO055_acc_x;
     double BNO055_acc_y;
     double BNO055_acc_z;
@@ -42,7 +42,7 @@ struct SDDataLogStruct { // This is the structure that will be written to each l
     double BNO055_gyr_y;
     double BNO055_gyr_z;
 
-    // Filtered, bias corrected sensor data.
+    // Filtered, bias corrected sensor data that is used in dead reckoning
     double BNO055_acc_x_filt;
     double BNO055_acc_y_filt;
     double BNO055_acc_z_filt;
@@ -77,6 +77,10 @@ struct SDDataLogStruct { // This is the structure that will be written to each l
     double DR_vel_x;
     double DR_vel_y;
     double DR_vel_z;
+
+    double DR_ori_x; // orientation data - will be nice to know how my algorithm works out afterwards
+    double DR_ori_y;
+    double DR_ori_z;
 };
 
 extern SDDataLogStruct SDDataLog;

@@ -7,7 +7,7 @@
 // include the library
 #include <Arduino.h>
 #include <RadioLib.h>
-#define lenReceiveBytes 255
+#define lenReceiveBytes 22
 
 
 #define WRITE 0b10000000
@@ -29,7 +29,7 @@ extern volatile bool enableInterrupt;
 
 extern int state;
 
-extern byte byteArr[255];
+extern byte byteArr[22];
 // prototypes
 void setFlag();
 
