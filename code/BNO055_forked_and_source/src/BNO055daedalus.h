@@ -45,6 +45,8 @@ extern Vector<double> filteredAccBNO055;
 extern Vector<double> filteredGyro;
 extern Vector<double> trueAccVect;
 
+extern volatile bool launchInterrupt;
+
 
 
 ///  Function Prototypes

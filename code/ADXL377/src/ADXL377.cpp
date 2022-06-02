@@ -32,9 +32,9 @@ Vector<double> getADXL377Acc () {
     int rawY = analogRead(ADXL377_YPin);
     int rawZ = analogRead(ADXL377_ZPin);
 
-    acc[0] = mapf(rawX, 0, 1023, -ADXLscale, ADXLscale) - 9.579712; // Between 0 and 1023 on 3.3V processor
-    acc[1] = mapf(rawY, 0, 1023, -ADXLscale, ADXLscale) - 9.8 + 5.747803;
-    acc[2] = mapf(rawZ, 0, 1023, -ADXLscale, ADXLscale) - 13.411499;
+    acc[0] = mapf(rawX, 0, 1023, -ADXLscale, ADXLscale); // Between 0 and 1023 on 3.3V processor
+    acc[1] = mapf(rawY, 0, 1023, -ADXLscale, ADXLscale);
+    acc[2] = mapf(rawZ, 0, 1023, -ADXLscale, ADXLscale);
     return acc;
 }
 

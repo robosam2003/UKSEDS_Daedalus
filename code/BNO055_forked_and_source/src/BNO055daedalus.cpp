@@ -1,8 +1,11 @@
 //
 // Created by robosam2003 on 03/05/2022.
-//
+// Datasheet: https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bno055-ds000.pdf
 
-#include "BNO055daedalus.h"
+
+// Very useful PDF on position and orientation estimation: https://arxiv.org/pdf/1704.06053.pdf
+
+#include "BNO055daedalus.h" 
 
 
 /// Global variable definitions:
@@ -19,20 +22,22 @@ double biasAverageAccThreshold = 0.3;
 
 Vector<double> pos = {0}; // For dead reckoning purposes.
 Vector<double> vel = {0};
-Vector<double> ori = {0};
+Vector<double> ori = {0}; // Orientation in Euler angles, "about x", "about y" and "about z" - roll, pitch and yaw - anticlockwise
 int DRcounter = 0;
 
 SimpleKalmanFilter filteredAccBNO055X = SimpleKalmanFilter(0.05, 0.05, 0.01);
 SimpleKalmanFilter filteredAccBNO055Y = SimpleKalmanFilter(0.05, 0.05, 0.01);
 SimpleKalmanFilter filteredAccBNO055Z = SimpleKalmanFilter(0.05, 0.05, 0.01);
 
-SimpleKalmanFilter filteredGyroX = SimpleKalmanFilter(0.05, 0.05, 0.01);
-SimpleKalmanFilter filteredGyroY = SimpleKalmanFilter(0.05, 0.05, 0.01);
-SimpleKalmanFilter filteredGyroZ = SimpleKalmanFilter(0.05, 0.05, 0.01);
+SimpleKalmanFilter filteredGyroX = SimpleKalmanFilter(0.1, 0.1, 0.01);
+SimpleKalmanFilter filteredGyroY = SimpleKalmanFilter(0.1, 0.1, 0.01);
+SimpleKalmanFilter filteredGyroZ = SimpleKalmanFilter(0.1, 0.1, 0.01);
 
 Vector<double> filteredAccBNO055;
 Vector<double> filteredGyro;
 Vector<double> trueAccVect;
+
+extern volatile bool launchInterrupt = false;
 
 
 void updateBNOFilters(Vector<double> gyro, Vector<double> acc){ // Update the filters with the latest measurements
@@ -265,7 +270,7 @@ Vector<double> find_gyr_biases() {
     return biases;
 }
 
-void remove_biases(Vector<double> acc_biases, Vector<double> gyrOffsets){
+void remove_biases(Vector<double> acc_biases, Vector<double> gyrOffsets){ // REDUNDANT - We now do it every loop after data aquisition
 
     signed short addresses[3][9] = {{ACC_OFFSET_X_LSB, ACC_OFFSET_X_MSB,
                                             ACC_OFFSET_Y_LSB, ACC_OFFSET_Y_MSB,
@@ -311,14 +316,33 @@ void remove_biases(Vector<double> acc_biases, Vector<double> gyrOffsets){
 }
 
 void getInitialOrientation() {
+    /* 
+    NDOF EULER MODE IS INACCURATE (due to EMI?? ) - SO WE USE acceleration vector to get initial orientation - 
+    Serial.printf("Getting initial orientation\n");
     sensor.setOperationMode(NDOF);
-    for (int i=0; i<40;i++) {
+    for (int i=0; i<100;i++) {
         ori = sensor.getEuler(); // seems to need a few tries before it works properly ???
         delay(10);
     }
     ori = sensor.getEuler(); // gives data in degrees
     Serial.printf("INITIAL ORIENTATION: %lf, %lf, %lf\n", ori[0], ori[1], ori[2]);
-    delay(2000);
+    delay(2000); */
+
+    Serial.printf("Getting initial orientation - Please ensure sensor is still\n");
+    delay(1000);
+
+    sensor.setOperationMode(AMG);
+    for (int i=0; i<50;i++) {
+        bno055_burst_t data = sensor.getAllData(); // allows things to settle
+        Vector <double> acc = data.accel;
+        delay(10);
+    }
+    bno055_burst_t data = sensor.getAllData();
+    Vector<double> acc = data.accel;
+    double radToDeg = 180/PI;
+    ori[0] = atan2(acc[1], acc[2]) * (radToDeg); // roll
+    ori[1] = atan2(-acc[0], acc[2]) * (radToDeg); // pitch
+    ori[2] = 0; // yaw/heading - doesn't matter what this is essentially.
 
 }
 
@@ -335,9 +359,7 @@ void deadReckoning(Vector<double> acc, Vector<double> omega, int updateTimeUs) {
     }
     trueAccVect = {0, 0, 0};
     calcRotationVect(acc, ori, trueAccVect);
-    // TODO: add a !launched condition to the following
-    //trueAccVect[2] -= 9.81;
-
+    trueAccVect[2] -= 9.81; // THIS IS JUST FOR TESTING, REMOVE LATER
 
     for (int i = 0; i < 3; i++) {
         /// Velocity calculation, First order hold.\n
@@ -349,14 +371,13 @@ void deadReckoning(Vector<double> acc, Vector<double> omega, int updateTimeUs) {
         if (abs(prevVect[DRcounter % numDR][3 + i]) != abs(vel[i])) {
             pos[i] += (updateTimeUs * 0.000001) * 0.5 * (vel[i] + prevVect[DRcounter % numDR][3 + i]);
         }
-        prevVect[DRcounter % numDR][3 +
-                                      i] = static_cast<double>(vel[i]); // setting previous value of velocity for next time.
+        prevVect[DRcounter % numDR][3 + i] = static_cast<double>(vel[i]); // setting previous value of velocity for next time.
     }
 
 }
 
 void liveBiasEstimation() {
-    /// This should be performed continuously, before launch.
+    /// This should be performed continuously, before launch. - BUT IT DOESNT WORK YET :(
 
 
     /// Live Accelerometer and gyroscope bias estimation\n
@@ -418,7 +439,7 @@ void liveBiasEstimation() {
 }
 
 void interruptCallback() {
-    digitalWrite(13, !digitalRead(13));
+    launchInterrupt = true;
 }
 
 void BNO055Setup() {
@@ -481,6 +502,6 @@ void BNO055Setup() {
     //calibrate();
     //acc_biases = find_acc_biases();
     //gyr_biases = find_gyr_biases();
-    getInitialOrientation();
+    //getInitialOrientation();
     sensor.setOperationMode(AMG);
 }
