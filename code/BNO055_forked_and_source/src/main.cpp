@@ -5,9 +5,7 @@
 
 void setup() {
     BNO055Setup();
-
 }
-
 
 
 
@@ -30,7 +28,7 @@ void loop() {
 
 
     /// Calculations
-    //deadReckoning(filteredAccBNO055, filteredGyro, cycleTimeus);
+    deadReckoning(filteredAccBNO055, filteredGyro, cycleTimeus);
 
 //    Serial.printf("TAV: %lf, %lf, %lf  |  ORI: %lf, %lf, %lf  |  ",
 //                  trueAccVect[0], trueAccVect[1], trueAccVect[2],
@@ -40,14 +38,15 @@ void loop() {
 
 //    Serial.printf("GYRO: %lf, %lf, %lf     ", filteredGyro[0], filteredGyro[1], filteredGyro[2]);
 
-    double radToDeg = 180/PI;
-    ori[0] = atan2(filteredAccBNO055[1], filteredAccBNO055[2]) * (radToDeg); // roll
-    ori[1] = atan2(-filteredAccBNO055[0], filteredAccBNO055[2]) * (radToDeg); // pitch
-    ori[2] = 0; // yaw/heading - doesn't matter what this is essentially
+    // double radToDeg = 180/PI;
+    // ori[0] = atan2(filteredAccBNO055[1], filteredAccBNO055[2]) * (radToDeg); // roll
+    // ori[1] = atan2(-filteredAccBNO055[0], filteredAccBNO055[2]) * (radToDeg); // pitch
+    // ori[2] = 0; // yaw/heading - doesn't matter what this is essentially
 
-    Serial.printf("FILT ACC : %lf, %lf, %lf     |    ORI (GYR): %lf, %lf, %lf  \n",
-             filteredAccBNO055[0], filteredAccBNO055[1], filteredAccBNO055[2],
-             filteredGyro[0], filteredGyro[1], filteredGyro[2]);
+    Serial.printf("TAV : %lf, %lf, %lf  |  ORI (GYR): %lf, %lf, %lf  | POS: %lf, %lf, %lf\n",
+            trueAccVect[0], trueAccVect[1], trueAccVect[2],
+            ori[0], ori[1], ori[2],
+            pos[0], pos[1], pos[2]);
              
 //    Serial.printf("filt ACC : %lf, %lf, %lf     \n", filteredAccBNO055[0], filteredAccBNO055[1], filteredAccBNO055[2]);
 //    Serial.printf("POS: %lf, %lf, %lf\n", pos[0], pos[1], pos[2]);

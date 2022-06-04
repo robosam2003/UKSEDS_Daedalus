@@ -22,7 +22,7 @@ double biasAverageAccThreshold = 0.3;
 
 Vector<double> pos = {0}; // For dead reckoning purposes.
 Vector<double> vel = {0};
-Vector<double> ori = {0}; // Orientation in Euler angles, "about x", "about y" and "about z" - roll, pitch and yaw - anticlockwise
+Vector<double> ori = {0, -90, 0}; // Orientation in Euler angles, "about x", "about y" and "about z" - roll, pitch and yaw - anticlockwise
 int DRcounter = 0;
 
 SimpleKalmanFilter filteredAccBNO055X = SimpleKalmanFilter(0.05, 0.05, 0.01);
@@ -52,6 +52,13 @@ void updateBNOFilters(Vector<double> gyro, Vector<double> acc){ // Update the fi
 
 }
 
+void enterToContinue(){
+    Serial.printf("\nPress Enter to continue");
+    while (!Serial.available());
+    Serial.println();
+    Serial.clear();
+}
+
 bno055_calib_stat_t calibrate(){
     sensor.setOperationMode(NDOF);
     for (int i=0;i<300;i++) {
@@ -59,7 +66,7 @@ bno055_calib_stat_t calibrate(){
         delay(10);
     }
     uint32_t timer = millis();
-    int timeout = 10000; // milliseconds
+    int timeout = 15000; // milliseconds
 
     bno055_calib_stat_t calstat = sensor.getCalibrationStatus();
     while ( ((calstat.accel < 3) || (calstat.gyro < 3) || (calstat.mag < 3) || (calstat.sys < 2) ) && ((millis() - timer) < timeout) ) {
@@ -134,18 +141,22 @@ Vector<double> find_acc_biases() {
     double acc_biases_y[num] = {0};
     double acc_biases_z[num] = {0};
 
-    sensor.setOperationMode(CONFIGMODE);  // set sensor to config mode to reset biases
-    for (auto x : {ACC_OFFSET_X_LSB, ACC_OFFSET_X_MSB, ACC_OFFSET_Y_LSB, ACC_OFFSET_Y_MSB, ACC_OFFSET_Z_LSB, ACC_OFFSET_Z_MSB}) {
-        sensor.writeRegister(x, 0x00);
-    }
+    // sensor.setOperationMode(CONFIGMODE);  // set sensor to config mode to reset biases
+    // for (auto x : {ACC_OFFSET_X_LSB, ACC_OFFSET_X_MSB, ACC_OFFSET_Y_LSB, ACC_OFFSET_Y_MSB, ACC_OFFSET_Z_LSB, ACC_OFFSET_Z_MSB}) {
+    //     sensor.writeRegister(x, 0x00);
+    // }
     //sensor.setOperationMode(NDOF); // NDOF mode getting orientation
 
     double avg_x = 0, avg_y = 0, avg_z = 0;
-    getInitialOrientation();
+    //getInitialOrientation();
 
-    ori[0] = 360-ori[0];   ori[1] = -ori[1];
+    //ori[0] = ori[0];   ori[1] = ori[1]; // WATCH THIS ONE
 
-    sensor.setOperationMode(AMG); // Setting to AMG mode for getting acceleration, because I fear acceleration values are different in fusion mode???
+    //sensor.setOperationMode(AMG); // Setting to AMG mode for getting acceleration, because I fear acceleration values are different in fusion mode???
+    if (!(sensor.getOperationMode()==AMG)) {
+        sensor.setOperationMode(AMG);
+    }
+
     // ACC calibration
     while (!biases_calibrated) {
         start = micros();
@@ -155,12 +166,12 @@ Vector<double> find_acc_biases() {
         Vector<double> gyroRaw = data.gyro; // getting all the data to simulate the exact same conditions as the main loop.
 
 
-        Vector<double> tav = {0,0,0};
-        calcRotationVect(acc_bias, ori, tav);
+        // Vector<double> tav = {0,0,0};
+        // calcRotationVect(acc_bias, ori, tav);
 
-        acc_biases_x[counter % num] = tav[0];
-        acc_biases_y[counter % num] = tav[1];
-        acc_biases_z[counter % num] = tav[2];
+        acc_biases_x[counter % num] = acc_bias[0];
+        acc_biases_y[counter % num] = acc_bias[1];
+        acc_biases_z[counter % num] = acc_bias[2];
         bool within_range_x = true;
         bool within_range_y = true;
         bool within_range_z = true;
@@ -174,7 +185,7 @@ Vector<double> find_acc_biases() {
             avg_y /= num;
             avg_z /= num;
 
-            double thres = 0.05;
+            double thres = 0.1;
             for (auto a: acc_biases_x) { if (abs((a - avg_x) > thres)) { within_range_x = false; }}
             for (auto b: acc_biases_y) { if (abs((b - avg_y) > thres)) { within_range_y = false; }}
             for (auto c: acc_biases_z) { if (abs((c - avg_z) > thres)) { within_range_z = false; }}
@@ -184,15 +195,15 @@ Vector<double> find_acc_biases() {
                 avg_y *= lambda; // scaling to make the total equal to 9.81
                 avg_z *= lambda;*/ /// not sure if this but works or is even necessary tbh.
 
-                Serial.println("calculated averages");
-                avg_z -= 9.81; // for if you are using acc data
+                Serial.println("calculated Offsets");
+                avg_x -= 9.81; // for if you are using acc data
                 biases_calibrated = true;
             }
         }
         counter++;
 
         if (Serial) {
-            for (int i=0;i<3;i++) { Serial.printf("%lf,     ", tav[i]); }
+            for (int i=0;i<3;i++) { Serial.printf("%lf,     ", acc_bias[i]); }
             for (int i=0;i<3;i++) { Serial.printf("%lf,     ", ori[i]); }
             Serial.printf("%lf, %lf, %lf       %d, %d, %d, %d    \n", avg_x, avg_y, avg_z, (counter > num), within_range_x, within_range_y, within_range_z);
         }
@@ -202,6 +213,7 @@ Vector<double> find_acc_biases() {
 
     }
     Vector <double> biases = {avg_x, avg_y, avg_z};
+    enterToContinue();
     return biases;
 }
 
@@ -215,12 +227,14 @@ Vector<double> find_gyr_biases() {
     double gyr_biases_y[num] = {0};
     double gyr_biases_z[num] = {0};
 
-    sensor.setOperationMode(CONFIGMODE);  // set sensor to config mode to reset biases
-    for (auto x : {GYR_OFFSET_X_LSB, GYR_OFFSET_X_MSB, GYR_OFFSET_Y_LSB, GYR_OFFSET_Y_MSB, GYR_OFFSET_Z_LSB, GYR_OFFSET_Z_MSB}) {
-        sensor.writeRegister(x, 0);
+    // sensor.setOperationMode(CONFIGMODE);  // set sensor to config mode to reset biases
+    // for (auto x : {GYR_OFFSET_X_LSB, GYR_OFFSET_X_MSB, GYR_OFFSET_Y_LSB, GYR_OFFSET_Y_MSB, GYR_OFFSET_Z_LSB, GYR_OFFSET_Z_MSB}) {
+    //     sensor.writeRegister(x, 0);
+    // }
+    //sensor.setOperationMode(AMG); // AMG mode for reading
+    if (!(sensor.getOperationMode()==AMG)) {
+        sensor.setOperationMode(AMG);
     }
-    sensor.setOperationMode(AMG); // AMG mode for reading
-
     double avg_x = 0, avg_y = 0, avg_z = 0;
 
     // GYR calibration
@@ -231,7 +245,7 @@ Vector<double> find_gyr_biases() {
         Vector<double> BNO055accRaw = data.accel;
         Vector<double> magRaw = data.mag;
         Vector<double> gyrVect = data.gyro;
-        updateBNOFilters(gyrVect, {0,0,0});
+        updateBNOFilters(gyrVect, BNO055accRaw);
         gyr_biases_x[counter % num] = filteredGyro[0];
         gyr_biases_y[counter % num] = filteredGyro[1];
         gyr_biases_z[counter % num] = filteredGyro[2];
@@ -267,6 +281,7 @@ Vector<double> find_gyr_biases() {
 
     }
     Vector <double> biases = {avg_x, avg_y, avg_z};
+    enterToContinue();
     return biases;
 }
 
@@ -316,19 +331,18 @@ void remove_biases(Vector<double> acc_biases, Vector<double> gyrOffsets){ // RED
 }
 
 void getInitialOrientation() {
-    /* 
-    NDOF EULER MODE IS INACCURATE (due to EMI?? ) - SO WE USE acceleration vector to get initial orientation - 
-    Serial.printf("Getting initial orientation\n");
-    sensor.setOperationMode(NDOF);
-    for (int i=0; i<100;i++) {
-        ori = sensor.getEuler(); // seems to need a few tries before it works properly ???
-        delay(10);
-    }
-    ori = sensor.getEuler(); // gives data in degrees
-    Serial.printf("INITIAL ORIENTATION: %lf, %lf, %lf\n", ori[0], ori[1], ori[2]);
-    delay(2000); */
+    // Serial.printf("Getting initial orientation\n");
+    // sensor.setOperationMode(NDOF);
+    // for (int i=0; i<100;i++) {
+    //     ori = sensor.getEuler(); // seems to need a few tries before it works properly ???
+    //     delay(10);
+    // }
+    // ori = sensor.getEuler(); // gives data in degrees
+    // Serial.printf("INITIAL ORIENTATION: %lf, %lf, %lf\n", ori[0], ori[1], ori[2]);
+    // delay(2000); 
 
     Serial.printf("Getting initial orientation - Please ensure sensor is still\n");
+    enterToContinue();
     delay(1000);
 
     sensor.setOperationMode(AMG);
@@ -498,10 +512,18 @@ void BNO055Setup() {
     interrupt.mask();
 
 
+    Serial.printf("Beginning Sensor calibration sequence, get ready to wave sensor for magnetometer\n");
+    enterToContinue();
+    calibrate();
+    Serial.printf("Sensor calibration sequence complete\n");
 
-    //calibrate();
-    //acc_biases = find_acc_biases();
-    //gyr_biases = find_gyr_biases();
+    Serial.printf("Finding initial bias values. Ensure the sensor is perfectly still and level\n");
+    enterToContinue();
+    acc_biases = find_acc_biases();
+    gyr_biases = find_gyr_biases();
+    Serial.printf("Initial bias values found\n");
+
+
     //getInitialOrientation();
-    sensor.setOperationMode(AMG);
+    //sensor.setOperationMode(AMG);
 }
