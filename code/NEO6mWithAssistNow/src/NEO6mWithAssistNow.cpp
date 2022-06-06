@@ -7,7 +7,7 @@
 
 #include "NEO6mWithAssistNow.h"
 
-GPSDataStruct GPSdata = {};
+GPSDataStruct GPSdata = {0};
 
 void NEO6mSetup() {
     getTimestampMillis();
@@ -18,7 +18,7 @@ void NEO6mSetup() {
     // must delay on first power up, because GPS sends text messages.
     delay(3000);
     Serial.begin(9600);
-    gpsSerial.begin(gpsBaudRate);
+    gpsSerial.begin(9600); // defaults to 9600
     serialClear();
 
     delay(100);
@@ -47,17 +47,7 @@ void getGPSData() {
     GPSdata.vAcc = POSLLH[30] | POSLLH[31] << 8 | POSLLH[32] << 16 | POSLLH[33] << 24;
 
 
-/*    Serial.printf("\nTOW:        %d\n", towMs);
-    Serial.printf("Actual TOW: %d\n", actualTimeOfWeekms()); // actual tow and tow from gps are synced
-    Serial.printf("Time %d:%d:%d\n", hour(), minute(), second());
-    Serial.printf("LONG: %lf\n", longitude);
-    Serial.printf("LAT: %lf\n", latitude);
-    Serial.printf("HEIGHT(m): %lf\n", height);
-    Serial.printf("HMSL(m): %lf\n", hMSL);
-    Serial.printf("HACC(m): %d\n", hAcc / 1000);
-    Serial.printf("VACC(m): %d\n", vAcc / 1000);
 
-    Serial.println();*/
 }
 
 time_t getTeensy3Time()
@@ -173,19 +163,22 @@ void sendUbx(byte ubxClassID, byte messageID, short payloadLength, const byte pa
     }
     buffer[payloadLength + 6] = CK_A;
     buffer[payloadLength + 7] = CK_B;
-    Serial.println("\nThis is the buffer:");
+    if (Serial) Serial.println("\nThis is the buffer:");
     for (int i=0;i<payloadLength+8;i++) {
-        Serial.printf("%02X ", buffer[i]);
+        if (Serial) Serial.printf("%02X ", buffer[i]);
     }
     /// Send the message
     for (int i = 0; i < payloadLength + 8; i++) {
-        gpsSerial.write(buffer[i]);
+        if (gpsSerial) gpsSerial.write(buffer[i]);
     }
 
-    gpsSerial.flush();
+    if (gpsSerial) gpsSerial.flush();
 
+    if (messageID == CFG_PRT) {
+        gpsSerial.begin(gpsBaudRate);
+    }
     char ackOrNack[64] = {0};
-    if (ubxClassID == CFG) {
+    if (ubxClassID == CFG) { // only for CFG messages
         delay(500); // needed for the reciever to have time to send ACK/NACK message.
         if (!gpsSerial.available()) { Serial.printf("The gps serial is not available."); };
         while (!gpsSerial.available());
@@ -219,11 +212,20 @@ void getUbx(byte ubxClassID, byte messageID, short payloadLength, byte payload[]
     /// ubxHeader1, ubxHeader2, ubxClassID, messageID, payloadLength, payload, checksumA, checksumB
     // Send the poll request with empty payload to poll.
 
-    sendUbx(ubxClassID, messageID, 0, nullptr);
 
-    // Wait for the response
-    while (gpsSerial.available() < (payloadLength + 8));
-    while (gpsSerial.peek() != ubxHeader1) { gpsSerial.read(); } // ensures reading starts from start of ubx packet
+    // Wait for the response with timeout
+    int TIMEOUT = 1000; // us
+    unsigned long startTime = micros();
+    while (gpsSerial.available() < (payloadLength + 8)) {
+        if (micros() - startTime > TIMEOUT) {
+            Serial.println("Timeout");
+            return;
+        }
+    }
+
+    while (gpsSerial.peek() != ubxHeader1) { 
+        gpsSerial.read(); 
+    } // ensures reading starts from start of ubx packet
     byte buffer[payloadLength + 8];
     gpsSerial.readBytes(buffer, payloadLength + 8);
 
@@ -361,11 +363,11 @@ void performOnlineAssist() {
     fileBuffer[19+headerLength] = (gpsweek & 0xFF00) >> 8;
 
     // configure time of week, little endian /:)
-    unsigned long timeOfWeekms = actualTimeOfWeekms();
+    unsigned long timeOfWeekms = actualTimeOfWeekms()+150;
     fileBuffer[20+headerLength] = (timeOfWeekms & 0x000000FF);
     fileBuffer[21+headerLength] = (timeOfWeekms & 0x0000FF00) >> 8;
     fileBuffer[22+headerLength] = (timeOfWeekms & 0x00FF0000) >> 16;
-    fileBuffer[23+headerLength] = (timeOfWeekms & 0xFF000000) >> 24; // This doesn't work because we change the checksum ey.
+    fileBuffer[23+headerLength] = (timeOfWeekms & 0xFF000000) >> 24; 
 
     Serial.println("\n\n\n");
 
@@ -451,8 +453,11 @@ void NEO6mConfig() {
 
 
     // set the neo6m config to ubx
-    byte CFG_CFG_payload[12] = {0,0,0,0, 0x00, 0x00, 0b00000110, 0b00011111, 0,0,0,0};
-    sendUbx(CFG, CFG_CFG, 12, CFG_CFG_payload);
+    byte CFG_CFG_payload[13] = {0,0,0,0,
+                                0, 0, 0b00000110, 0b00011111, 
+                                0, 0, 0b00000110, 0b00011111,
+                                0b00000001};
+    sendUbx(CFG, CFG_CFG, 13, CFG_CFG_payload);
 
 
 }

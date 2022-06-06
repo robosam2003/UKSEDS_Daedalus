@@ -25,8 +25,7 @@
 #define transistorPin 32
 #define ubxHeader1 0xB5
 #define ubxHeader2 0x62
-#define gpsBaudRate 9600
-
+#define gpsBaudRate 115200 // running at faster than default to avoid serial reads of over 10ms (which was common at 9600 BAUD)
 
 /// Change this what Serial port the GPS is connected to
 #define gpsSerial Serial2 // Hardware serial port for GPS
@@ -40,8 +39,11 @@ struct GPSDataStruct {
     signed int hAcc; // horizontal accuracy estimate in mm
     signed int vAcc; // vertical accuracy estimate in mm
 };
+extern GPSDataStruct GPSdata;
 
 void NEO6mSetup();
+
+void getGPSData();
 
 void getGPSlatLongAlt(double GPSdata[3]);
 
