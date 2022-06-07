@@ -7,7 +7,7 @@
 // include the library
 #include <Arduino.h>
 #include <RadioLib.h>
-#define lenReceiveBytes 22
+#define lenReceiveBytes 23
 
 
 #define WRITE 0b10000000
@@ -23,15 +23,20 @@ extern RFM96 radio;
 
 // flag to indicate that a packet was received
 extern volatile bool receivedFlag;
+extern volatile bool transmittedFlag;
+
 
 // disable interrupt when it's not needed
 extern volatile bool enableInterrupt;
 
 extern int state;
 
-extern byte byteArr[22];
+extern byte byteArr[lenReceiveBytes];
 // prototypes
+
 void setFlag();
+
+void setFlagRecieve();
 
 void SPIREGSET(byte address, byte value);
 

@@ -1,14 +1,15 @@
 //
 // Created by robos on 03/05/2022.
 //
-#include <RFM96WrecieveLORA.h>
+#include "RFM96WrecieveLORA.h"
 
 
 // init externs
 RFM96 radio = new Module(10, 2, 9, 3);
 volatile bool receivedFlag = false;
+volatile bool transmittedFlag = true;
 volatile bool enableInterrupt = true;
-byte byteArr[22] = {};
+byte byteArr[lenReceiveBytes] = {};
 int state = 0;
 
 void RFM96WrecieveLORASetup() {
@@ -24,7 +25,8 @@ void RFM96WrecieveLORASetup() {
 
     // set the function that will be called
     // when new packet is received
-    radio.setDio0Action(setFlag);
+    radio.setDio0Action(setFlagRecieve);
+    
 
 //    // spreading factor 6
 //    radio.setSpreadingFactor(6);
@@ -50,6 +52,15 @@ void RFM96WrecieveLORASetup() {
 }
 
 void setFlag() {
+    // check if the interrupt is enabled
+    if(!enableInterrupt) {
+        return;
+    }
+    // we sent a packet, set the flag
+    transmittedFlag = true;
+}
+
+void setFlagRecieve() {
     // check if the interrupt is enabled
     if(!enableInterrupt) {
         return;

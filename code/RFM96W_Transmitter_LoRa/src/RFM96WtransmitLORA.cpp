@@ -7,10 +7,14 @@
 
 // init externs
 elapsedMicros microTimer;
-volatile bool transmittedFlag = false;
-volatile bool enableInterrupt = true;
+volatile bool receivedFlag = false; // flag to indicate that a packet was received
+volatile bool transmittedFlag = false; // flag to indicate that a packet was sent
+volatile bool enableInterrupt = true; 
 int transmissionState = RADIOLIB_ERR_NONE;
 RFM96 radio  = new Module(CS, 2, 9, 3);
+
+byte byteArr[lenTransmissionBytes] = {};
+int state = 0;
 
 int SPIREADREG(byte address, int bytesToRead){  // FIFO
     address = READ | address; // puts 0 int the 8th bit.
@@ -42,6 +46,15 @@ void setFlag() {
     }
     // we sent a packet, set the flag
     transmittedFlag = true;
+}
+
+void setFlagRecieve() {
+    // check if the interrupt is enabled
+    if(!enableInterrupt) {
+        return;
+    }
+    // we got a packet, set the flag
+    receivedFlag = true;
 }
 
 void transmitData(byte arr[]) {
@@ -114,7 +127,64 @@ void RFM96WtransmitSetup() { // assumes serial is setup.
 
 
     // start transmitting the first packet
-    if (Serial) { Serial.print(F("[RFM96W] Sending first packet ... ")); }
-    char str[] = {0,0,0,0,0,0,0,0};
-    transmissionState = radio.startTransmit(str);
+    if (Serial) { Serial.print(F("[RFM96W] Sending first packet ...\n ")); }
+    byteArr[0] = 0xAA; // Test code
+    state = radio.startTransmit(byteArr, lenTransmissionBytes);
+    delay(1000);
+    
+}
+
+void RFM96WrecieveBytesLORA() {
+    // check if the flag is set
+    if(receivedFlag) {
+        // disable the interrupt service routine while
+        // processing the data
+        enableInterrupt = false;
+
+        // reset flag
+        receivedFlag = false;
+
+
+        state = radio.readData(byteArr, lenTransmissionBytes);
+
+        if (state == RADIOLIB_ERR_NONE) {
+            // packet was successfully received
+            //Serial.println(F("[RFM96W] Received packet!"));
+
+            // print data of the packet
+            //Serial.print(F("[RFM96W] Data:\t\t\n"));
+            //for (auto x : byteArr) { Serial.print(x); Serial.print(", ");}
+
+            // print RSSI (Received Signal Strength Indicator)
+            //Serial.print(F("[RFM96W] RSSI:\t\t"));
+            //Serial.print(radio.getRSSI());
+            //Serial.println(F(" dBm"));
+
+            // print SNR (Signal-to-Noise Ratio)
+            //Serial.print(F("[RFM96W] SNR:\t\t"));
+            //Serial.print(radio.getSNR());
+            //Serial.println(F(" dB"));
+
+            // print frequency error
+            //Serial.print(F("[RFM96W] Frequency error:\t"));
+            //Serial.print(radio.getFrequencyError());
+            //Serial.println(F(" Hz"));
+
+        } else if (state == RADIOLIB_ERR_CRC_MISMATCH) {
+            // packet was received, but is malformed
+            //Serial.println(F("[RFM96W] CRC error!"));
+
+        } else {
+            // some other error occurred
+            //Serial.print(F("[RFM96W] Failed, code "));
+            //Serial.println(state);
+        }
+
+        // put module back to listen mode
+        state = radio.startReceive();
+
+        // we're ready to receive more packets,
+        // enable interrupt service routine
+        enableInterrupt = true;
+    }
 }

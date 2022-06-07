@@ -12,16 +12,18 @@
 #define WRITE 0b10000000
 #define READ 0b00000000
 #define CS 37
-#define lenTransmissionBytes 22
+#define lenTransmissionBytes 23 // one status byte at the start
 
 extern elapsedMicros microTimer;
+
+extern volatile bool receivedFlag;
 // flag to indicate that a packet was sent
 extern volatile bool transmittedFlag;
 
 // disable interrupt when it's not needed
 extern volatile bool enableInterrupt;
-
-
+extern byte byteArr[lenTransmissionBytes];
+extern int state;
 
 
 // NSS pin:   37
@@ -33,6 +35,8 @@ extern RFM96 radio;
 // prototypes
 void setFlag();
 
+void setFlagRecieve();
+
 void SPIREGSET(byte address, byte value);
 
 int SPIREADREG(byte address, int bytesToRead);
@@ -40,6 +44,10 @@ int SPIREADREG(byte address, int bytesToRead);
 void RFM96WtransmitSetup();
 
 void transmitData(byte arr[]);
+
+
+
+void RFM96WrecieveBytesLORA();
 
 // save transmission state between loops
 extern int transmissionState;

@@ -6,6 +6,8 @@
 // I have absolutely no idea why just I cant just include the .h file JUST for the transmitter, but hey-ho - quick fix, it works
 #include "C:\Users\robos\CLionProjects\UKSEDS_Daedalus\code\RFM96W_Transmitter_LoRa\src\RFM96WtransmitLORA.h"
 #include "C:\Users\robos\CLionProjects\UKSEDS_Daedalus\code\RFM96W_Transmitter_LoRa\src\RFM96WtransmitLORA.cpp"
+//#include "C:\Users\robos\CLionProjects\UKSEDS_Daedalus\code\RFM96W_Reciever_LoRa\src\RFM96WrecieveLORA.h"
+//#include "C:\Users\robos\CLionProjects\UKSEDS_Daedalus\code\RFM96W_Reciever_LoRa\src\RFM96WrecieveLORA.cpp"
 
 #include "C:\Users\robos\CLionProjects\UKSEDS_Daedalus\code\BMP280\src\BMP280.h"
 
@@ -53,19 +55,18 @@
  *
  *
  */
-
-#define RTC_SYNC_BYTE 0x99
 byte statusCode = 0b00000000; // This can be altered to show various stages of the launch.
 #define LAUNCH_DETECTION_MASK 0b00000001
 #define GPS_TURN_ON_MASK 0b00000010
 
 
-void enterToContinue(){
-    Serial.printf("Press Enter to continue");
-    while (!Serial.available());
-    Serial.println();
-    Serial.clear();
-}
+// Transmittsion/reception codes
+#define RTC_SYNC_BYTE 0x99
+#define TEST_CODE 0xAA
+#define LAUNCH_COMMIT_CODE 0xBB
+#define LAUNCH_COMMIT_CONFIRM 0xCC
+#define DATA_CODE 0xDD
+
 
 void fullSystemTest() {
     // Tests each subsystem for several seconds. 
@@ -106,17 +107,36 @@ void fullSystemTest() {
                       filteredADXL[0], filteredADXL[1], filteredADXL[2]);
         delay(10);
     }
+
+    Serial.printf("ADXL377 test complete.\n Press enter to continue");
+    enterToContinue();
+
+    Serial.printf("Testing RFM96W transmission for 15 Seconds... \n");
+    delay(500);
+    for (int i=0; i<15*100; i++) {
+        byte data[23] = {};
+        data[0] = 0xAA;
+        transmitData(data);
+        Serial.printf("Successfully transmitted data.\n");
+        delay(10);
+    }
+
+    Serial.printf("Testing NEO6m...\n");
+    enterToContinue();
+    Serial.printf("Testing NEO6m for 60 Seconds... \n");
+
+
 }
 
 void groundRTCSync() {
+    //radio.setDio0Action(setFlag);
     u_int64_t unixTime = getTimestampMillis();
     Serial.printf("UNIX TIME: %llu\n", unixTime);
-    byte arr[22];
-    arr[0] = RTC_SYNC_BYTE; // sync byte
+    byte arr[lenTransmissionBytes] = {RTC_SYNC_BYTE};
     for (int i=0; i<8; i++) {
         arr[i+1] = (unixTime >> (7 * 8 - (i * 8))) & 0xFF; // little endian
     }
-
+    while(!transmittedFlag); // transmittedFlag should be true here.
     transmitData(arr);
     Serial.printf("Successfully transmitted UNIX TIME to ground station.\n");
 
@@ -137,13 +157,13 @@ void setup() {
      *  - ADXL377
      *  - BMP280
      *  - GPS  */
-    BNO055Setup();
-    ADXL377Setup();
-    BMP280Setup();
-    NEO6mSetup();
+    // BNO055Setup();
+    // ADXL377Setup();
+    // BMP280Setup();
+    // NEO6mSetup();
 
 /** Initialise SD card and transmitter */
-    sdSetup();
+    //sdSetup();
     RFM96WtransmitSetup();
     Serial.printf("SUCCESS - All systems initialised.\n");
 
@@ -155,24 +175,48 @@ void setup() {
     
 
 /** Full system test before launch */
-    fullSystemTest();
+    //fullSystemTest();
 
 
 
-/** Calibrate sensors (BNO055) and calculate offsets (BNO055)*/
 
+/** Wait for "Launch commit" message from ground station */
+    // Set up RFM96W as receiver
+    radio.setDio0Action(setFlagRecieve);
 
-/** Wait for "Launch commit" mesasnge from ground station */
+    // Wait for Launch commit message
+    bool launchCommit = false;
+    while (!launchCommit) {
+        Serial.println("Waiting for launch commit code from ground station...");
+        int state = radio.startReceive();
+        while(!receivedFlag); // wait for packet
+        state = radio.readData(byteArr, lenTransmissionBytes);
+        //RFM96WrecieveBytesLORA();
+        Serial.println("Received message");
+        if (byteArr[0] == LAUNCH_COMMIT_CODE) {
+            launchCommit = true;
+            Serial.println("Launch commit message received");
+        }
+        else {
+            Serial.println("That wasnt the launch commit code");
+        }
+    }
+    delay(500);
+    // Set up RFM96W as transmitter
+    radio.setDio0Action(setFlag);
+    // Send confirmation message to ground station
+    char launchCommitMessasge[23] = {LAUNCH_COMMIT_CONFIRM, 0,0,0,0,0,0,0};
+    transmissionState = radio.startTransmit(launchCommitMessasge);
+    Serial.println("Sent launch commit confirmation");
+    
+    
 
+/// We are now on the launch pad, ready to launch.
 
-/** Save current GPS coords to SD card */
-
-
-
-/** Shut down GPS ready for launch */
-
-
-/// We now enter the "ready for launch loop": loop()
+/** (BNO055) Determine current Orientation using accelerometers and gravity vector*/
+    getInitialOrientation();
+    Serial.printf("Initial orientation determined: %lf, %lf, %lf \n", ori[0], ori[1], ori[2]);
+    while(1);
 } 
 
 void loop() {
@@ -191,8 +235,6 @@ void loop() {
     getBMP280Data(bmpData);
 
     
-
-
 
 
 /// Filter updates
