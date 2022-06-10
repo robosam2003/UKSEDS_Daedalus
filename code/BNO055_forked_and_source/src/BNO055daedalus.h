@@ -52,6 +52,8 @@ extern volatile bool launchInterrupt;
 ///  Function Prototypes
 void updateBNOFilters(Vector<double> gyro, Vector<double> acc);
 
+void enterToContinue();
+
 bno055_calib_stat_t calibrate();
 
 double magnitude(Vector<double> vect);

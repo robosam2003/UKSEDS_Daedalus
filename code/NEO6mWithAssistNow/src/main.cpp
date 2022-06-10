@@ -13,12 +13,14 @@ void setup() {
 
 
 void loop() {
-    sendUbx(NAV, NAV_POSLLH, 0, nullptr);
-    delay(200);
     unsigned long startTime = micros();
-    getGPSData();
+    sendUbx(NAV, NAV_POSLLH, 0, nullptr);
     unsigned long endTime = micros();
-    Serial.printf("\nTime taken to get GPS data: %d (us) ", endTime - startTime);
+
+    delay(200);
+    
+    getGPSData();
+    Serial.printf("\nTime taken to send GPS data: %d (us) ", endTime - startTime);
     if (Serial) {
         Serial.printf("\nTOW:        %d\n", GPSdata.towMs);
         Serial.printf("Actual TOW: %d\n", actualTimeOfWeekms()); // actual tow and tow from gps are synced

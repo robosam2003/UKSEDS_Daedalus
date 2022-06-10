@@ -10,7 +10,10 @@ RingBuf<FsFile, RING_BUF_CAPACITY> rb;
 SDDataLogStruct SDDataLog;
 
 
-void sdSetup() {
+void sdSetup(unsigned long long timeStamp) {
+    char LOG_FILENAME[30] = "";
+    sprintf(LOG_FILENAME, "daedalusDataLog%llu.csv", timeStamp);
+
     // Initialize the SD.
     if (!sd.begin(SD_CONFIG)) {
         sd.initErrorHalt(&Serial);

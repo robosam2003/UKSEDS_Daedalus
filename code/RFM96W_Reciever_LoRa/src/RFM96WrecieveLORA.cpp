@@ -43,7 +43,7 @@ void RFM96WrecieveLORASetup() {
     Serial.print(F("[RFM96W] Starting to listen ... "));
     state = radio.startReceive();
     if (state == RADIOLIB_ERR_NONE) {
-        Serial.println(F("success!"));
+       Serial.println(F("success!"));
     } else {
         Serial.print(F("failed, code "));
         Serial.println(state);
@@ -144,5 +144,29 @@ void SPIREGSET(byte address, byte value) {
     SPI.transfer(address);
     SPI.transfer(value);
     digitalWrite(CS, HIGH); // pulls CS high, which ends the transfer
+
+}
+
+void transmitData(byte arr[]) {
+    // This should be called after checking that transmittedFlag is true
+
+    if(transmittedFlag) {
+        Serial.println(F("[RFM96W] Transmitting packet! becuase the flag is true"));
+        // disable the interrupt service routine while
+        // processing the data
+        enableInterrupt = false;
+
+        // reset flag
+        transmittedFlag = false;
+
+        
+        
+        /// transmit lenTransmissionBytes bytes of data from arr[]
+        int state = radio.startTransmit(arr, lenReceiveBytes);
+        
+        // we're ready to send more packets,
+        // enable interrupt service routine
+        enableInterrupt = true;
+    }
 
 }

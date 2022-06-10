@@ -7,7 +7,7 @@
 
 #include "NEO6mWithAssistNow.h"
 
-GPSDataStruct GPSdata = {0};
+struct GPSDataStruct GPSdata;
 
 void NEO6mSetup() {
     getTimestampMillis();
@@ -163,10 +163,10 @@ void sendUbx(byte ubxClassID, byte messageID, short payloadLength, const byte pa
     }
     buffer[payloadLength + 6] = CK_A;
     buffer[payloadLength + 7] = CK_B;
-    if (Serial) Serial.println("\nThis is the buffer:");
-    for (int i=0;i<payloadLength+8;i++) {
-        if (Serial) Serial.printf("%02X ", buffer[i]);
-    }
+    // if (Serial) Serial.println("\nThis is the buffer:");
+    // for (int i=0;i<payloadLength+8;i++) {
+    //     if (Serial) Serial.printf("%02X ", buffer[i]);
+    // }
     /// Send the message
     for (int i = 0; i < payloadLength + 8; i++) {
         if (gpsSerial) gpsSerial.write(buffer[i]);
@@ -331,8 +331,23 @@ void performOnlineAssist() {
      • Send optional UBX-AID-ALM (almanac) message. **/
 
     if (!SD.begin(BUILTIN_SDCARD)) {
-        Serial.println("Could not mount SD card");
-        while (true);
+        bool sdCardInitialised = false;
+        for (int i=0;i<10;i++) {
+            if (!SD.begin(BUILTIN_SDCARD)) {
+                Serial.println("SD Card failed to initialize");
+                delay(500);
+            } else {
+                Serial.println("SD Card initialized");
+                sdCardInitialised = true;
+                break;
+            }
+            delay(1000);
+        }
+        if (!sdCardInitialised) {
+            Serial.println("Could not mount SD card");
+            while(1);
+        }
+        
     }
     Serial.println("Card initialised");
 

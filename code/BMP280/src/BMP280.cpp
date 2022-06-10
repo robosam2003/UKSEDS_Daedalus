@@ -3,6 +3,7 @@
 
 /// datasheet: https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bmp280-ds001.pdf
 
+struct bmp280DataStruct bmpData;
 
 
 Adafruit_BMP280 bmp(BMP_CS); // hardware SPI
@@ -16,11 +17,8 @@ void BMP280Setup() {
                     Adafruit_BMP280::STANDBY_MS_1 );
 }
 
-void getBMP280Data(double returnVect[]) {
-    float a = bmp.readTemperature();
-    float b = bmp.readPressure();
-    float c = bmp.readAltitude(1013.25); // Adjust to local forecast!
-    returnVect[0] = a;
-    returnVect[1] = b;
-    returnVect[2] = c;
+void getBMP280Data(double seaLevelHPA) {
+    bmpData.temperature = static_cast<double>( bmp.readTemperature() );
+    bmpData.pressure =    static_cast<double>( bmp.readPressure() );
+    bmpData.altitude =    static_cast<double>( bmp.readAltitude(seaLevelHPA) ); // in meters
 }

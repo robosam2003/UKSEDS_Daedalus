@@ -8,7 +8,7 @@
 
 void setup() {
     Serial.begin(9600);
-    sdSetup();
+    sdSetup(0);
 
 
 }

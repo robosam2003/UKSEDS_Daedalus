@@ -47,7 +47,7 @@ void RFM96WrecieveLORASetup();
 
 void RFM96WrecieveBytesLORA();
 
-
+void transmitData(byte arr[]);
 
 
 

@@ -55,27 +55,30 @@
  *
  *
  */
-byte statusCode = 0b00000000; // This can be altered to show various stages of the launch.
-#define LAUNCH_DETECTION_MASK 0b00000001
-#define GPS_TURN_ON_MASK 0b00000010
+byte statusCode = 0b00000000; // This can be altered to show various stages of the launch FOR SD CARD
 
+double SEA_LEVEL_HPA = 1016; // CHANGE TO LOCAL FORECAST
 
-// Transmittsion/reception codes
+// Transmittsion/reception codes - FOR TRANSMISSION
 #define RTC_SYNC_BYTE 0x99
 #define TEST_CODE 0xAA
 #define LAUNCH_COMMIT_CODE 0xBB
 #define LAUNCH_COMMIT_CONFIRM 0xCC
 #define DATA_CODE 0xDD
+unsigned long long cycleCounter = 0;
+bool launched = false;
+
+double launchThreshold = 2*9.81;
 
 
 void fullSystemTest() {
     // Tests each subsystem for several seconds. 
     // Do this just before launch, Use HTERM for terminal input.
-    Serial.printf("---------- FULL SYSTEM TEST ----------\n\nPress enter to continue");
+    Serial.printf("---------- FULL SYSTEM TEST ----------\n\n");
 
     Serial.printf("Timestamp test...\n");
     delay(500);
-    for (int i=0; i<50; i++) {
+    for (int i=0; i<10; i++) {
         uint64_t ts = getTimestampMillis();
         Serial.printf("UNIX TIME: %llu\n", ts);
         delay(100);
@@ -83,12 +86,14 @@ void fullSystemTest() {
     Serial.printf("Timestamp test complete.\n");
     enterToContinue();
 
-    Serial.printf("Testing BNO055 for 15 Seconds... \n");
+    Serial.printf("Testing BNO055 for 10 Seconds... \n");
     delay(500);
-    for (int i=0; i<15*100; i++) {
+    for (int i=0; i<10*100; i++) {
         bno055_burst_t burst = sensor.getAllData();
         Vector<double>rawBNO055Acc = burst.accel;
         Vector<double>rawBNO055Gyro = burst.gyro;
+        for(int i=0;i<3;i++) { rawBNO055Acc[i] -= acc_biases[i];  rawBNO055Gyro[i] -= gyr_biases[i]; }
+
         updateBNOFilters(rawBNO055Gyro, rawBNO055Acc);
         Serial.printf("BNO055 RAW - acc: (x, y, z) %lf, %lf, %lf     gyro : (x, y, z) %lf, %lf, %lf\n",
                       rawBNO055Acc[0], rawBNO055Acc[1], rawBNO055Acc[2],
@@ -98,32 +103,55 @@ void fullSystemTest() {
     Serial.printf("BNO055 test complete.\n");
     enterToContinue();
 
-    Serial.printf("Testing ADXL377 for 15 Seconds... \n");
+    Serial.printf("Testing ADXL377 for 10 Seconds... \n");
     delay(500);
-    for (int i=0; i<15*100; i++) {
+    for (int i=0; i<10*100; i++) {
         Vector<double> rawADXLacc = getADXL377Acc();
         updateADXL377Filters(rawADXLacc);
-        Serial.printf("ADXL377 FILTERED - acc: (x, y, z) %lf, %lf, %lf\n",
-                      filteredADXL[0], filteredADXL[1], filteredADXL[2]);
+        Serial.printf("ADXL377 RAW - acc: (x, y, z) %lf, %lf, %lf\n",
+                      rawADXLacc[0], rawADXLacc[1], rawADXLacc[2]);
         delay(10);
     }
 
-    Serial.printf("ADXL377 test complete.\n Press enter to continue");
+    Serial.printf("ADXL377 test complete.\n");
     enterToContinue();
 
     Serial.printf("Testing RFM96W transmission for 15 Seconds... \n");
-    delay(500);
-    for (int i=0; i<15*100; i++) {
+    //delay(500);
+    for (int i=0; i<200; i++) {
         byte data[23] = {};
         data[0] = 0xAA;
+        while(!transmittedFlag);
         transmitData(data);
         Serial.printf("Successfully transmitted data.\n");
-        delay(10);
+        delay(30);
     }
 
     Serial.printf("Testing NEO6m...\n");
     enterToContinue();
-    Serial.printf("Testing NEO6m for 60 Seconds... \n");
+    Serial.printf("Testing NEO6m. Press enter to exit loop (when locked)\n");
+    delay(500);
+    Serial.clear();
+    while(1) {
+        if (Serial.available()){
+            Serial.printf("Entering main loop.\n");
+            break;
+        }
+        sendUbx(NAV, NAV_POSLLH, 0, nullptr);
+        delay(200);
+        getGPSData();
+        Serial.printf("\nTOW:        %d\n", GPSdata.towMs);
+        Serial.printf("Actual TOW: %d\n", actualTimeOfWeekms());
+        Serial.printf("Time %d:%d:%d\n", hour(), minute(), second());
+        Serial.printf("LONG: %lf\n", GPSdata.lon);
+        Serial.printf("LAT: %lf\n", GPSdata.lat);
+        Serial.printf("HMSL(m): %lf\n", GPSdata.alt);
+        Serial.printf("HACC(m): %d\n", GPSdata.hAcc / 1000);
+        Serial.printf("VACC(m): %d\n", GPSdata.vAcc / 1000);
+        
+    }
+
+
 
 
 }
@@ -163,7 +191,8 @@ void setup() {
     // NEO6mSetup();
 
 /** Initialise SD card and transmitter */
-    //sdSetup();
+    //unsigned long long timestampSDFileName = getTimestampMillis();
+    //sdSetup(timestampSDFileName);
     RFM96WtransmitSetup();
     Serial.printf("SUCCESS - All systems initialised.\n");
 
@@ -208,73 +237,233 @@ void setup() {
     char launchCommitMessasge[23] = {LAUNCH_COMMIT_CONFIRM, 0,0,0,0,0,0,0};
     transmissionState = radio.startTransmit(launchCommitMessasge);
     Serial.println("Sent launch commit confirmation");
-    
-    
 
-/// We are now on the launch pad, ready to launch.
+// /** Wait for "Launch commit" message from ground station */
+//     // Set up RFM96W as receiver
+//     radio.setDio0Action(setFlagRecieve);
+
+//     // Wait for Launch commit message
+//     bool launchCommit = false;
+//     while (!launchCommit) {
+//         Serial.println("Waiting for launch commit code from ground station...");
+//         int state = radio.startReceive();
+//         while(!receivedFlag); // wait for packet
+//         RFM96WrecieveBytesLORA();
+//         Serial.println("Received message");
+//         if (byteArr[0] == LAUNCH_COMMIT_CODE) {
+//             launchCommit = true;
+//             Serial.println("Launch commit message received");
+//         }
+//         else {
+//             Serial.println("That wasnt the launch commit code");
+//         }
+//     }
+//     delay(1000);
+//     // Set up RFM96W as transmitter
+//     radio.setDio0Action(setFlag);
+//     // Send confirmation message to ground station
+//     byte launchCommitMessasge[23] = {LAUNCH_COMMIT_CONFIRM, 0,0,0,0,0,0,0}; // TODO: this is not working??? 
+//     //transmissionState = radio.startTransmit(launchCommitMessasge);
+//     while(!transmittedFlag); // wait for packet
+//     transmitData(launchCommitMessasge);
+//     Serial.println("Sent launch commit confirmation");
+    
+//     launched = false;
+//     launchInterrupt = false; // for in case the interrupt ran before we got here, due to movement of loading rocket
+// /// We are now on the launch pad, ready to launch.
 
 /** (BNO055) Determine current Orientation using accelerometers and gravity vector*/
     getInitialOrientation();
     Serial.printf("Initial orientation determined: %lf, %lf, %lf \n", ori[0], ori[1], ori[2]);
-    while(1);
+
+    // Send GPS request
+    sendUbx(NAV, NAV_POSLLH, 0, nullptr);
+    delay(200);
+    //while(1);
+
 } 
 
 void loop() {
-
-    
-/// Data acquisition - BNO055, ADXL377, BMP280
+    unsigned long startOfLoopUs = micros();
+/** Data acquisition - BNO055, ADXL377, BMP280 */
     // Get timestamp
     uint64_t timestamp = getTimestampMillis();
-
+    
+    // Get ADXL377 data
     Vector<double>rawADXLacc = getADXL377Acc();
+
+    // Get and parse BNO055 data
     bno055_burst_t burst = sensor.getAllData();
     Vector<double>rawBNO055Acc = burst.accel;
     Vector<double>rawBNO055Gyro = burst.gyro;
 
-    double bmpData[3];
-    getBMP280Data(bmpData);
-
-    
-
-
-/// Filter updates
-    updateBNOFilters(rawBNO055Gyro, rawBNO055Acc);
-    updateADXL377Filters(rawADXLacc);
-
-
-/// Launch detection 
-    // TODO: test launch detection interrupt. 
-    if (!launchInterrupt && (magnitude(filteredAccBNO055) < 2*9.81)) { // TODO: detemine magnitude threshold
-        launchInterrupt = true;
-    }
-/// Calculations
-
-
-/// Data logging
-    SDDataLog.timeStamp = timestamp;
+    // Especially for Tom, so he can see the effects that biasing have on dead reckoning results
     SDDataLog.BNO055_acc_x = rawBNO055Acc[0];
     SDDataLog.BNO055_acc_y = rawBNO055Acc[1];
     SDDataLog.BNO055_acc_z = rawBNO055Acc[2];
     SDDataLog.BNO055_gyr_x = rawBNO055Gyro[0];
     SDDataLog.BNO055_gyr_y = rawBNO055Gyro[1];
     SDDataLog.BNO055_gyr_z = rawBNO055Gyro[2];
-    SDDataLog.ADXL_acc_x = rawADXLacc[0];
-    SDDataLog.ADXL_acc_y = rawADXLacc[1];
-    SDDataLog.ADXL_acc_z = rawADXLacc[2];
-    SDDataLog.BMP280_temp = bmpData[0];
-    SDDataLog.BMP280_pres = bmpData[1];
-    SDDataLog.BMP280_alt = bmpData[2];
 
-    // TODO: Add GPS data under conditions
+    // bias correction
+    for(int i=0;i<3;i++) { rawBNO055Acc[i] -= acc_biases[i];  rawBNO055Gyro[i] -= gyr_biases[i]; }
+
+    /// Filter updates
+    updateBNOFilters(rawBNO055Gyro, rawBNO055Acc);
+    updateADXL377Filters(rawADXLacc);
+
+    // Launch detection
+    if (!launched && ( launchInterrupt || (magnitude(filteredAccBNO055) > launchThreshold) ) ) { 
+        // ^ critical efficiency /:)
+        launchInterrupt = true;
+        launched = true;
+    }
+    sensor.clearInterrupt();
+    //Serial.printf("%d, %d, %lf, %lf\n", launched, launchInterrupt, launchThreshold, magnitude(filteredAccBNO055)); //For testing interrupts and launch detection
+    
+    // Get BMP280 data
+    getBMP280Data(SEA_LEVEL_HPA);
+
+    // Get GPS data every 200ms - 5Hz
+    if ((cycleCounter % 20) == 0) {
+        getGPSData();
+        sendUbx(NAV, NAV_POSLLH, 0, nullptr); // send request for next GPS data, will be available in 200ms (20 cycles)
+        SDDataLog.GPS_lat = GPSdata.lat;
+        SDDataLog.GPS_lon = GPSdata.lon;
+        SDDataLog.GPS_alt = GPSdata.alt;
+        SDDataLog.GPS_tow = GPSdata.towMs;
+        SDDataLog.GPS_hacc = GPSdata.hAcc;
+        SDDataLog.GPS_vacc = GPSdata.vAcc;
+    }
+
+    
+/** Calculations */
+    if (launched) {
+        if (magnitude(filteredAccBNO055) > 14*9.81) { // over 14g, we use the ADXL377 data
+            deadReckoning(filteredADXL, filteredGyro, cycleTimeus);
+        }
+        else {
+            deadReckoning(filteredAccBNO055, filteredGyro, cycleTimeus);
+        }
+    }
+    
+
+/** Data logging */
+    SDDataLog.logCode = statusCode;
+    SDDataLog.timeStamp = timestamp;
+    // Raw, (NOT bias corrected) filtered sensor data especially for Tom.
+    //   ^ done above, before bias correction
+
+    // Filtered, bias corrected sensor data that is used in dead reckoning
+    SDDataLog.BNO055_acc_x_filt = filteredAccBNO055[0];
+    SDDataLog.BNO055_acc_y_filt = filteredAccBNO055[1];
+    SDDataLog.BNO055_acc_z_filt = filteredAccBNO055[2];
+    SDDataLog.BNO055_gyr_x_filt = filteredGyro[0];
+    SDDataLog.BNO055_gyr_y_filt = filteredGyro[1];
+    SDDataLog.BNO055_gyr_z_filt = filteredGyro[2];
+
+    // ADXL377 
+    SDDataLog.ADXL_acc_x = filteredADXL[0];
+    SDDataLog.ADXL_acc_y = filteredADXL[1];
+    SDDataLog.ADXL_acc_z = filteredADXL[2];
+
+    // BMP280
+    SDDataLog.BMP280_temp = bmpData.temperature;
+    SDDataLog.BMP280_pres = bmpData.pressure;
+    SDDataLog.BMP280_alt = bmpData.altitude;
+
+    // NEO6M 
+    //  ^ above 
+
+    // Dead reckoning
+    SDDataLog.DR_pos_x = pos[0];
+    SDDataLog.DR_pos_y = pos[1];
+    SDDataLog.DR_pos_z = pos[2];
+    SDDataLog.DR_vel_x = vel[0];
+    SDDataLog.DR_vel_y = vel[1];
+    SDDataLog.DR_vel_z = vel[2];
+    SDDataLog.DR_ori_x = ori[0];
+    SDDataLog.DR_ori_y = ori[1];
+    SDDataLog.DR_ori_z = ori[2];
+
+    // Write to SD card
+    logData();
 
 
-    // TODO: Add Dead reckoning data. - include orientation!
+/** Data transmission every third cycle */
+    if ((cycleCounter % 3) == 0) {
+        // Encode data as bytes: // most of this section was automatically generated by github copilot - incredible!
+        
+        // Status Code
+        byteArr[0] = DATA_CODE;
+
+        // BMP280  altitude
+        int bmpAltTransmit = bmpData.altitude * 1000;
+        byteArr[1] = (bmpAltTransmit >> 24) & 0xFF;
+        byteArr[2] = (bmpAltTransmit >> 16) & 0xFF;
+        byteArr[3] = (bmpAltTransmit >> 8) & 0xFF;
+        byteArr[4] = bmpAltTransmit & 0xFF;
+
+        // Dead reckoning position Z
+        short DRZ = static_cast<short>(pos[3]*10);
+        byteArr[5] = DRZ >> 8;
+        byteArr[6] = DRZ & 0xFF; // Big endian
+        
+        // Absolute Acceleration (BNO055 or ADXL)
+        short absAccTransmit = static_cast<short>(magnitude(filteredAccBNO055)*100);
+        byteArr[7] = absAccTransmit >> 8;
+        byteArr[8] = absAccTransmit & 0xFF; // Big endian :( 
+        
+        // Absolute Velocity (Dead reckoning)
+        short absVelTransmit = static_cast<short>(magnitude(vel)*100);
+        byteArr[9] = absVelTransmit >> 8;
+        byteArr[10] = absVelTransmit & 0xFF; 
+
+        // GPS latitiude
+        int latTransmit = GPSdata.lat * 1000000;
+        byteArr[11] = (latTransmit >> 24) & 0xFF;
+        byteArr[12] = (latTransmit >> 16) & 0xFF;
+        byteArr[13] = (latTransmit >> 8) & 0xFF;
+        byteArr[14] = latTransmit & 0xFF;
+
+        // GPS longitude
+        int lonTransmit = GPSdata.lon * 1000000;
+        byteArr[15] = (lonTransmit >> 24) & 0xFF;
+        byteArr[16] = (lonTransmit >> 16) & 0xFF;
+        byteArr[17] = (lonTransmit >> 8) & 0xFF;
+        byteArr[18] = lonTransmit & 0xFF;
+        
+        // GPS altitude
+        int GPSaltTransmit = GPSdata.alt * 1000;
+        byteArr[19] = (GPSaltTransmit >> 24) & 0xFF;
+        byteArr[20] = (GPSaltTransmit >> 16) & 0xFF;
+        byteArr[21] = (GPSaltTransmit >> 8) & 0xFF;
+        byteArr[22] = GPSaltTransmit & 0xFF;
 
 
+        // Transmit byteArr
+        unsigned long transmitTimoutMicros = micros();
+        bool transmitTimeout = false;
+        while (!transmittedFlag) {
+            if (micros() - transmitTimoutMicros > 1000) { // 1ms timeout
+                transmitTimeout = true;
+                break;
+            }
+        }
+        if (!transmitTimeout) {
+            transmitData(byteArr);
+        }
 
-/// Data transmission every third cycle
+
+    }
 
 
-/// Ensuring cycles are 10ms long
+/** Increment cycle counter */
+    cycleCounter++; 
 
+/** Ensuring cycles are 10ms long */
+    unsigned long endOfLoopus = micros();
+    if ((endOfLoopus-startOfLoopUs) < 10000) {
+        delayMicroseconds(10000 - (endOfLoopus-startOfLoopUs));
+    } // if the loop exceeded 10ms, there's nothing we can do. :(
 }

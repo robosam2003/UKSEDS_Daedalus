@@ -66,7 +66,7 @@ bno055_calib_stat_t calibrate(){
         delay(10);
     }
     uint32_t timer = millis();
-    int timeout = 15000; // milliseconds
+    int timeout = 7000; // milliseconds
 
     bno055_calib_stat_t calstat = sensor.getCalibrationStatus();
     while ( ((calstat.accel < 3) || (calstat.gyro < 3) || (calstat.mag < 3) || (calstat.sys < 2) ) && ((millis() - timer) < timeout) ) {
@@ -454,12 +454,14 @@ void liveBiasEstimation() {
 
 void interruptCallback() {
     launchInterrupt = true;
+    Serial.println("BNO055 INTERRUPT");
 }
 
 void BNO055Setup() {
     Wire.setClock(1000000);  // i2c seems to work great at 1Mhz
     Wire.begin();
     pinMode(13, OUTPUT);
+    pinMode(5, INPUT_PULLDOWN);
 
     sensor.begin();
     sensor.setPowerMode(NORMAL);
@@ -510,17 +512,17 @@ void BNO055Setup() {
 
     // route this interrupt to the INT pin on the sensor
     interrupt.mask();
-
+    sensor.clearInterrupt();
 
     Serial.printf("Beginning Sensor calibration sequence, get ready to wave sensor for magnetometer\n");
-    enterToContinue();
-    calibrate();
+    //enterToContinue();
+    //calibrate();
     Serial.printf("Sensor calibration sequence complete\n");
 
     Serial.printf("Finding initial bias values. Ensure the sensor is perfectly still and level\n");
-    enterToContinue();
-    acc_biases = find_acc_biases();
-    gyr_biases = find_gyr_biases();
+    //enterToContinue();
+    //acc_biases = find_acc_biases(); // TODO: Uncomment when ready
+    //gyr_biases = find_gyr_biases();
     Serial.printf("Initial bias values found\n");
 
 

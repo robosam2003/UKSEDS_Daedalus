@@ -20,7 +20,8 @@
 // Space to hold more than 800 ms of data for 10 byte lines at 25 ksps.
 #define RING_BUF_CAPACITY 400*512
 
-#define LOG_FILENAME "daedalusDataLog2.csv" // csv is far easier than other formats.
+// We are now generating a unique filename for each log.
+//#define LOG_FILENAME "daedalusDataLog2.csv" // csv is far easier than other formats.
 
 extern SdFs sd;
 extern FsFile file;
@@ -34,7 +35,7 @@ struct SDDataLogStruct { // This is the structure that will be written to each l
     byte logCode;
     u_int64_t timeStamp;
     /** BNO055 **/
-    // Raw, (NOT bias corrected) filtered sensor data especially for Tom.
+    // Raw, (NOT bias corrected) unfiltered sensor data especially for Tom.
     double BNO055_acc_x;
     double BNO055_acc_y;
     double BNO055_acc_z;
@@ -51,7 +52,7 @@ struct SDDataLogStruct { // This is the structure that will be written to each l
     double BNO055_gyr_z_filt;
 
     /** ADXL377 **/
-    // Raw filtered data.
+    //Ffiltered data.
     double ADXL_acc_x;
     double ADXL_acc_y;
     double ADXL_acc_z;
@@ -86,7 +87,7 @@ struct SDDataLogStruct { // This is the structure that will be written to each l
 extern SDDataLogStruct SDDataLog;
 
 
-void sdSetup();
+void sdSetup(unsigned long long timeStamp);
 
 void logData();
 

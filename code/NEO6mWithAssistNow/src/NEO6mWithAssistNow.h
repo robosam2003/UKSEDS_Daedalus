@@ -39,7 +39,7 @@ struct GPSDataStruct {
     signed int hAcc; // horizontal accuracy estimate in mm
     signed int vAcc; // vertical accuracy estimate in mm
 };
-extern GPSDataStruct GPSdata;
+extern struct GPSDataStruct GPSdata;
 
 void NEO6mSetup();
 
