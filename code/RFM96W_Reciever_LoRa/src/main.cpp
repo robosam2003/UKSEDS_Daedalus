@@ -112,7 +112,7 @@ void loop() {
             Serial.println("\nRTC synced!");
             char unixTimeStr[20] = {0};
             uintToStr(unixTimeMs, unixTimeStr);
-            Serial.print(unixTimeStr);   
+            Serial.println(unixTimeStr);   
             
             break; }
         case TEST_CODE: {
@@ -156,14 +156,41 @@ void loop() {
             digitalWrite(GREEN_LED_PIN, HIGH);
             break; }
         case DATA_CODE: {
+            union byte_float_union {
+                byte bytesFromFloat[4];
+                float floatVal;
+            };
             uint64_t timestamp = unixTimeMs + (millis() - RTCsyncMillis);
-            double BMP280Alt = ((byteArr[1] << 24) | (byteArr[2] << 16) | (byteArr[3] << 8) | (byteArr[4]) ) / 1000.0;
-            double DRZ = ((byteArr[5] << 8) | (byteArr[6]) ) / 10.0;
-            double absAcc = ((byteArr[7] << 8) | (byteArr[8]) ) / 100.0;
-            double absVel = ((byteArr[9] << 8) | (byteArr[10]) ) / 100.0;
-            double GPSLat = ((byteArr[11] << 24) | (byteArr[12] << 16) | (byteArr[13] << 8) | (byteArr[14]) ) / 1000000.0;
-            double GPSLon = ((byteArr[15] << 24) | (byteArr[16] << 16) | (byteArr[17] << 8) | (byteArr[18]) ) / 1000000.0;
-            double GPSAlt = ((byteArr[19] << 24) | (byteArr[20] << 16) | (byteArr[21] << 8) | (byteArr[22]) ) / 1000.0;
+            byte_float_union bf;
+            bf.bytesFromFloat[0] = byteArr[1];
+            bf.bytesFromFloat[1] = byteArr[2];
+            bf.bytesFromFloat[2] = byteArr[3];
+            bf.bytesFromFloat[3] = byteArr[4];
+            float BMP280Alt = bf.floatVal;
+
+            float DRZ = ((byteArr[5] << 8) | (byteArr[6]) ) / 10.0;
+
+            float absAcc = ((byteArr[7] << 8) | (byteArr[8]) ) / 100.0;
+
+            float absVel = ((byteArr[9] << 8) | (byteArr[10]) ) / 100.0;
+
+            bf.bytesFromFloat[0] = byteArr[11]; // github copilot saving my life again
+            bf.bytesFromFloat[1] = byteArr[12];
+            bf.bytesFromFloat[2] = byteArr[13];
+            bf.bytesFromFloat[3] = byteArr[14];
+            float GPSLat = bf.floatVal;
+
+            bf.bytesFromFloat[0] = byteArr[15];
+            bf.bytesFromFloat[1] = byteArr[16];
+            bf.bytesFromFloat[2] = byteArr[17];
+            bf.bytesFromFloat[3] = byteArr[18];
+            float GPSLon = bf.floatVal;
+
+            bf.bytesFromFloat[0] = byteArr[19];
+            bf.bytesFromFloat[1] = byteArr[20];
+            bf.bytesFromFloat[2] = byteArr[21];
+            bf.bytesFromFloat[3] = byteArr[22];
+            float GPSAlt = bf.floatVal;
 
             char BMP280AltStr[20] = "";
             char DRZStr[20] = "";
@@ -173,7 +200,7 @@ void loop() {
             char GPSLonStr[20] = "";
             char GPSAltStr[20] = "";
 
-            dtostrf(BMP280Alt, 7, 7, BMP280AltStr); // github copilot for the win
+            dtostrf(BMP280Alt, 7, 7, BMP280AltStr); 
             dtostrf(DRZ, 7, 7, DRZStr);
             dtostrf(absAcc, 7, 7, absAccStr);
             dtostrf(absVel, 7, 7, absVelStr);

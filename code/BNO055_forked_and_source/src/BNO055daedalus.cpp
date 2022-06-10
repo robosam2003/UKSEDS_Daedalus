@@ -527,5 +527,5 @@ void BNO055Setup() {
 
 
     //getInitialOrientation();
-    //sensor.setOperationMode(AMG);
+    sensor.setOperationMode(AMG);
 }

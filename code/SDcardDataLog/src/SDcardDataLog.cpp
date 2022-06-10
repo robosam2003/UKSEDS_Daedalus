@@ -36,7 +36,7 @@ void sdSetup(unsigned long long timeStamp) {
     }
     // initialize the RingBuf.
     rb.begin(&file);
-
+    Serial.printf("SD Card set up complete.\n");
 }
 
 void logData() { // can log up to 512 bytes
