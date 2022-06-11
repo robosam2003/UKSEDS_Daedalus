@@ -342,7 +342,7 @@ void getInitialOrientation() {
     // delay(2000); 
 
     Serial.printf("Getting initial orientation - Please ensure sensor is still\n");
-    enterToContinue();
+    //enterToContinue();
     delay(1000);
 
     sensor.setOperationMode(AMG);
@@ -373,7 +373,7 @@ void deadReckoning(Vector<double> acc, Vector<double> omega, int updateTimeUs) {
     }
     trueAccVect = {0, 0, 0};
     calcRotationVect(acc, ori, trueAccVect);
-    trueAccVect[2] -= 9.81; // THIS IS JUST FOR TESTING, REMOVE LATER
+    //trueAccVect[2] -= 9.81; // THIS IS JUST FOR TESTING, REMOVE LATER
 
     for (int i = 0; i < 3; i++) {
         /// Velocity calculation, First order hold.\n

@@ -103,14 +103,16 @@ void fullSystemTest() {
     Serial.printf("BNO055 test complete.\n");
     enterToContinue();
 
-    Serial.printf("Testing ADXL377 for 10 Seconds... \n");
+    Serial.printf("Testing ADXL377 for 60 Seconds... \n");
     delay(500);
-    for (int i=0; i<10*100; i++) {
+    for (int i=0; i<60*100; i++) {
+        uint32_t start = micros();
         Vector<double> rawADXLacc = getADXL377Acc();
         updateADXL377Filters(rawADXLacc);
-        Serial.printf("ADXL377 RAW - acc: (x, y, z) %lf, %lf, %lf\n",
-                      rawADXLacc[0], rawADXLacc[1], rawADXLacc[2]);
-        delay(10);
+        Serial.printf("ADXL377 filtered - acc: (x, y, z) %lf, %lf, %lf\n",
+                      filteredADXL[0], filteredADXL[1], filteredADXL[2]);
+        uint32_t end = micros();
+        delayMicroseconds( ((end-start) < cycleTimeus ) ? (cycleTimeus- (end - start) ) : 0 );
     }
 
     Serial.printf("ADXL377 test complete.\n");
@@ -186,10 +188,11 @@ void setup() {
      *  - ADXL377
      *  - BMP280
      *  - GPS  */
-    BNO055Setup();
-    ADXL377Setup();
     BMP280Setup();
     NEO6mSetup();
+    BNO055Setup();
+    ADXL377Setup();
+
 
 /** Initialise SD card and transmitter */
     unsigned long long timestampSDFileName = getTimestampMillis();

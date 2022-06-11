@@ -15,6 +15,7 @@ void BMP280Setup() {
                     Adafruit_BMP280::SAMPLING_X4,
                     Adafruit_BMP280::FILTER_X16,
                     Adafruit_BMP280::STANDBY_MS_1 );
+    Serial.printf("BMP280 initialised.\n");
 }
 
 void getBMP280Data(double seaLevelHPA) {
