@@ -165,13 +165,13 @@ Vector<double> find_acc_biases() {
         Vector<double> magRaw = data.mag;
         Vector<double> gyroRaw = data.gyro; // getting all the data to simulate the exact same conditions as the main loop.
 
-
+        updateBNOFilters(gyroRaw, acc_bias);
         // Vector<double> tav = {0,0,0};
         // calcRotationVect(acc_bias, ori, tav);
 
-        acc_biases_x[counter % num] = acc_bias[0];
-        acc_biases_y[counter % num] = acc_bias[1];
-        acc_biases_z[counter % num] = acc_bias[2];
+        acc_biases_x[counter % num] = filteredAccBNO055[0];
+        acc_biases_y[counter % num] = filteredAccBNO055[1];
+        acc_biases_z[counter % num] = filteredAccBNO055[2];
         bool within_range_x = true;
         bool within_range_y = true;
         bool within_range_z = true;
@@ -196,14 +196,14 @@ Vector<double> find_acc_biases() {
                 avg_z *= lambda;*/ /// not sure if this but works or is even necessary tbh.
 
                 Serial.println("calculated Offsets");
-                avg_x -= 9.81; // for if you are using acc data
+                avg_x -= 9.81;  // removing the gravity component - only for stable, flat, upright rigs
                 biases_calibrated = true;
             }
         }
         counter++;
 
         if (Serial) {
-            for (int i=0;i<3;i++) { Serial.printf("%lf,     ", acc_bias[i]); }
+            for (int i=0;i<3;i++) { Serial.printf("%lf,     ", filteredAccBNO055[i]); }
             for (int i=0;i<3;i++) { Serial.printf("%lf,     ", ori[i]); }
             Serial.printf("%lf, %lf, %lf       %d, %d, %d, %d    \n", avg_x, avg_y, avg_z, (counter > num), within_range_x, within_range_y, within_range_z);
         }
@@ -260,7 +260,7 @@ Vector<double> find_gyr_biases() {
             avg_y /= num;
             avg_z /= num;
 
-            double thres = 0.05;
+            double thres = 0.5;
             for (auto a: gyr_biases_x) { if (abs((a - avg_x) > thres)) { within_range_x = false; }}
             for (auto b: gyr_biases_y) { if (abs((b - avg_y) > thres)) { within_range_y = false; }}
             for (auto c: gyr_biases_z) { if (abs((c - avg_z) > thres)) { within_range_z = false; }}
@@ -345,18 +345,37 @@ void getInitialOrientation() {
     //enterToContinue();
     delay(1000);
 
-    sensor.setOperationMode(AMG);
-    for (int i=0; i<50;i++) {
-        bno055_burst_t data = sensor.getAllData(); // allows things to settle
-        Vector <double> acc = data.accel;
+    //sensor.setOperationMode(AMG);
+    for (int i=0; i<500;i++) {
+        bno055_burst_t data = sensor.getAllData();
+        Vector<double> acc = data.accel;
+        Vector <double> gyro = data.gyro;
+        updateBNOFilters(acc, gyro);
+
+        // remove bias from acc
+        acc[0] -= acc_biases[0];
+        acc[1] -= acc_biases[1];
+        acc[2] -= acc_biases[2];
+
+        double radToDeg = 180/PI;
+        double x = acc[0];
+        double y = acc[1];
+        double z = acc[2];
+
+        ori[0] = atan2(y, (sqrt(z*z + x*x)))*radToDeg;
+        ori[1] = atan2(-x, sqrt(y*y+z*z))*radToDeg;
+        ori[2] = 0;
+        Serial.printf("INITIAL ORIENTATION: %lf, %lf, %lf\n", ori[0], ori[1], ori[2]);
         delay(10);
     }
-    bno055_burst_t data = sensor.getAllData();
-    Vector<double> acc = data.accel;
-    double radToDeg = 180/PI;
-    ori[0] = atan2(acc[1], acc[2]) * (radToDeg); // roll
-    ori[1] = atan2(-acc[0], acc[2]) * (radToDeg); // pitch
-    ori[2] = 0; // yaw/heading - doesn't matter what this is essentially.
+
+
+
+    // double radToDeg = 180/PI;
+    // ori[0] = atan2(filteredAccBNO055[1], filteredAccBNO055[2]) * (radToDeg); // roll
+    // ori[1] = atan2(-filteredAccBNO055[0], filteredAccBNO055[2]) * (radToDeg); // pitch
+    // ori[2] = 0; // yaw/heading - doesn't matter what this is essentially. 
+    // // SHOULD USE FILTERED VALUES
 
 }
 
@@ -498,6 +517,13 @@ void BNO055Setup() {
     //sensor.writeRegister(BNO055_AXIS_MAP_CONFIG, 0x24); // TODO: Check that this will be correct for our pcb (Axis remap);
     sensor.writeRegister(BNO055_AXIS_MAP_SIGN, 0b00000000);
 
+    
+
+    Serial.printf("Beginning Sensor calibration sequence, get ready to wave sensor for magnetometer\n");
+    enterToContinue();
+    //calibrate();
+    Serial.printf("Sensor calibration sequence complete\n");
+
     // interrupt setup
     BNO055::AccelHighGInterrupt interrupt(
             sensor,
@@ -514,18 +540,15 @@ void BNO055Setup() {
     interrupt.mask();
     sensor.clearInterrupt();
 
-    Serial.printf("Beginning Sensor calibration sequence, get ready to wave sensor for magnetometer\n");
-    //enterToContinue();
-    //calibrate();
-    Serial.printf("Sensor calibration sequence complete\n");
 
     Serial.printf("Finding initial bias values. Ensure the sensor is perfectly still and level\n");
-    //enterToContinue();
-    //acc_biases = find_acc_biases(); // TODO: Uncomment when ready
-    //gyr_biases = find_gyr_biases();
+    enterToContinue();
+    acc_biases = find_acc_biases(); // TODO: Uncomment when ready
+    gyr_biases = find_gyr_biases();
     Serial.printf("Initial bias values found\n");
 
 
     //getInitialOrientation();
     sensor.setOperationMode(AMG);
+    getInitialOrientation();
 }

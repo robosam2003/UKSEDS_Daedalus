@@ -28,28 +28,32 @@ void loop() {
 
 
     /// Calculations
-    deadReckoning(filteredAccBNO055, filteredGyro, cycleTimeus);
+    //deadReckoning(filteredAccBNO055, filteredGyro, cycleTimeus);
 
-//    Serial.printf("TAV: %lf, %lf, %lf  |  ORI: %lf, %lf, %lf  |  ",
-//                  trueAccVect[0], trueAccVect[1], trueAccVect[2],
-//                 //  vel[0], vel[1], vel[2],
-//                 //  pos[0], pos[1], pos[2],
-//                  ori[0], ori[1], ori[2]);
+    trueAccVect = {0,0,0};
+    calcRotationVect(filteredAccBNO055, ori, trueAccVect);
 
-//    Serial.printf("GYRO: %lf, %lf, %lf     ", filteredGyro[0], filteredGyro[1], filteredGyro[2]);
+    double radToDeg = 180/PI;
+    double x = filteredAccBNO055[0];
+    double y = filteredAccBNO055[1];
+    double z = filteredAccBNO055[2];
 
-    // double radToDeg = 180/PI;
+    ori[0] = atan2(y, (sqrt(z*z + x*x)))*radToDeg;
+    ori[1] = atan2(-x, sqrt(y*y+z*z))*radToDeg;
+    ori[2] = 0;
+
+
     // ori[0] = atan2(filteredAccBNO055[1], filteredAccBNO055[2]) * (radToDeg); // roll
-    // ori[1] = atan2(-filteredAccBNO055[0], filteredAccBNO055[2]) * (radToDeg); // pitch
-    // ori[2] = 0; // yaw/heading - doesn't matter what this is essentially
-
-    Serial.printf("TAV : %lf, %lf, %lf  |  ORI (GYR): %lf, %lf, %lf  | POS: %lf, %lf, %lf\n",
-            trueAccVect[0], trueAccVect[1], trueAccVect[2],
-            ori[0], ori[1], ori[2],
-            pos[0], pos[1], pos[2]);
+    // ori[1] = atan2(-filteredAccBNO055[0], (sqrt(filteredAccBNO055[0]))) * (radToDeg); // pitch
+    // ori[2] = 0; // yaw/heading - doesn't matter what this is essentially. 
+    // SHOULD USE FILTERED VALUES
              
-//    Serial.printf("filt ACC : %lf, %lf, %lf     \n", filteredAccBNO055[0], filteredAccBNO055[1], filteredAccBNO055[2]);
-//    Serial.printf("POS: %lf, %lf, %lf\n", pos[0], pos[1], pos[2]);
+    Serial.printf("ACC: %lf, %lf, %lf     -    ORI(from acc) : %lf, %lf, %lf     \n     -  TAV: %lf, %lf, %lf", 
+    filteredAccBNO055[0], filteredAccBNO055[1], filteredAccBNO055[2],
+    ori[0], ori[1], ori[2],
+    trueAccVect[0], trueAccVect[1], trueAccVect[2]);
+    
+
 
 
 
