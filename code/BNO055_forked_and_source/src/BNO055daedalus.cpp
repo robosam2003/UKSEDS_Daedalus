@@ -346,7 +346,7 @@ void getInitialOrientation() {
     delay(1000);
 
     //sensor.setOperationMode(AMG);
-    for (int i=0; i<500;i++) {
+    for (int i=0; i<10;i++) {
         bno055_burst_t data = sensor.getAllData();
         Vector<double> acc = data.accel;
         Vector <double> gyro = data.gyro;
@@ -514,14 +514,13 @@ void BNO055Setup() {
 
 
 
-    //sensor.writeRegister(BNO055_AXIS_MAP_CONFIG, 0x24); // TODO: Check that this will be correct for our pcb (Axis remap);
     sensor.writeRegister(BNO055_AXIS_MAP_SIGN, 0b00000000);
 
     
 
     Serial.printf("Beginning Sensor calibration sequence, get ready to wave sensor for magnetometer\n");
     enterToContinue();
-    //calibrate();
+    calibrate();
     Serial.printf("Sensor calibration sequence complete\n");
 
     // interrupt setup
@@ -543,12 +542,12 @@ void BNO055Setup() {
 
     Serial.printf("Finding initial bias values. Ensure the sensor is perfectly still and level\n");
     enterToContinue();
-    acc_biases = find_acc_biases(); // TODO: Uncomment when ready
+    acc_biases = find_acc_biases();
     gyr_biases = find_gyr_biases();
     Serial.printf("Initial bias values found\n");
 
 
     //getInitialOrientation();
     sensor.setOperationMode(AMG);
-    getInitialOrientation();
 }
+

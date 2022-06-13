@@ -6,7 +6,7 @@
 
 
 float ADXLscale = 200*9.8; //  (±200g) for ADXL377
-int a = 4;
+int a = 1;
 SimpleKalmanFilter filteredAccADXL377_X = SimpleKalmanFilter(a, a, 0.01);
 SimpleKalmanFilter filteredAccADXL377_Y = SimpleKalmanFilter(a, a, 0.01);
 SimpleKalmanFilter filteredAccADXL377_Z = SimpleKalmanFilter(a, a, 0.01);

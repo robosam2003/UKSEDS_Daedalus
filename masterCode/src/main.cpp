@@ -57,7 +57,7 @@
  */
 byte statusCode = 0b00000000; // This can be altered to show various stages of the launch FOR SD CARD
 
-double SEA_LEVEL_HPA = 1016; // CHANGE TO LOCAL FORECAST
+double SEA_LEVEL_HPA = 1010; // CHANGE TO LOCAL FORECAST
 
 // Transmittsion/reception codes - FOR TRANSMISSION
 #define RTC_SYNC_BYTE 0x99
@@ -70,6 +70,9 @@ bool launched = false;
 
 double launchThreshold = 2*9.81;
 
+#define LAUNCH_DETECT_MASK 0b00000001   
+
+#define buzzerPin 24
 
 void fullSystemTest() {
     // Tests each subsystem for several seconds. 
@@ -103,9 +106,9 @@ void fullSystemTest() {
     Serial.printf("BNO055 test complete.\n");
     enterToContinue();
 
-    Serial.printf("Testing ADXL377 for 60 Seconds... \n");
+    Serial.printf("Testing ADXL377 for 15 Seconds... \n");
     delay(500);
-    for (int i=0; i<60*100; i++) {
+    for (int i=0; i<15*100; i++) {
         uint32_t start = micros();
         Vector<double> rawADXLacc = getADXL377Acc();
         updateADXL377Filters(rawADXLacc);
@@ -114,7 +117,7 @@ void fullSystemTest() {
         uint32_t end = micros();
         delayMicroseconds( ((end-start) < cycleTimeus ) ? (cycleTimeus- (end - start) ) : 0 );
     }
-
+    
     Serial.printf("ADXL377 test complete.\n");
     enterToContinue();
 
@@ -273,15 +276,16 @@ void setup() {
 //     while(!transmittedFlag); // wait for packet
 //     transmitData(launchCommitMessasge);
 //     Serial.println("Sent launch commit confirmation"); 
-//     launched = false;
-//     launchInterrupt = false; // for in case the interrupt ran before we got here, due to movement of loading rocket
+
 
 // /// We are now on the launch pad, ready to launch.
 
 /** (BNO055) Determine current Orientation using accelerometers and gravity vector*/
     getInitialOrientation();
-    Serial.printf("Initial orientation determined: %lf, %lf, %lf \n", ori[0], ori[1], ori[2]);
 
+    Serial.printf("Initial orientation determined: %lf, %lf, %lf \n", ori[0], ori[1], ori[2]);
+    launched = false;
+    launchInterrupt = false; // for in case the interrupt ran before we got here, due to movement of loading rocket
     // Send GPS request
     sendUbx(NAV, NAV_POSLLH, 0, nullptr);
     delay(200);
@@ -316,14 +320,16 @@ void loop() {
     for(int i=0;i<3;i++) { rawBNO055Acc[i] -= acc_biases[i];  rawBNO055Gyro[i] -= gyr_biases[i]; }
 
     /// Filter updates
-    updateBNOFilters(rawBNO055Gyro, rawBNO055Acc);
+    updateBNOFilters(rawBNO055Gyro, rawBNO055Acc);  
     updateADXL377Filters(rawADXLacc);
+    tone(buzzerPin, (1000+((int)timestamp%1000)));
 
     // Launch detection
     if (!launched && ( launchInterrupt || (magnitude(filteredAccBNO055) > launchThreshold) ) ) { 
         // ^ critical efficiency /:)
         launchInterrupt = true;
         launched = true;
+        statusCode |= LAUNCH_DETECT_MASK;
     }
     sensor.clearInterrupt();
     //Serial.printf("%d, %d, %lf, %lf\n", launched, launchInterrupt, launchThreshold, magnitude(filteredAccBNO055)); //For testing interrupts and launch detection
@@ -340,7 +346,7 @@ void loop() {
         SDDataLog.GPS_alt = GPSdata.alt;
         SDDataLog.GPS_tow = GPSdata.towMs;
         SDDataLog.GPS_hacc = GPSdata.hAcc;
-        SDDataLog.GPS_vacc = GPSdata.vAcc;
+        SDDataLog.GPS_vacc = GPSdata.vAcc; 
     }
 
     
@@ -411,10 +417,13 @@ void loop() {
 
         }
         byteArr[0] = DATA_CODE; 
+
+        
         union byte_float_union {
             byte bytesFromFloat[4];
             float floatVal;
         };
+        
 
         // BMP280  altitude
         float bmpAltTransmit = static_cast<float>(bmpData.altitude);
@@ -428,17 +437,24 @@ void loop() {
         byteArr[4] = bmpAltUnion.bytesFromFloat[3];
 
         // Dead reckoning position Z
-        short DRZ = static_cast<short>(pos[3]*10);
+        short DRZ = static_cast<short>(pos[2]*10);
         byteArr[5] = DRZ >> 8;
         byteArr[6] = DRZ & 0xFF; // Big endian
         
         // Absolute Acceleration (BNO055 or ADXL)
-        short absAccTransmit = static_cast<short>(magnitude(filteredAccBNO055)*100);
-        byteArr[7] = absAccTransmit >> 8;
-        byteArr[8] = absAccTransmit & 0xFF; // Big endian :( 
+        if (magnitude(filteredAccBNO055) > 14*9.81) { // over 14g, we use the ADXL377 data
+            short absAccTransmit = static_cast<short>(magnitude(filteredADXL)*100);
+            byteArr[7] = absAccTransmit >> 8;
+            byteArr[8] = absAccTransmit & 0xFF; // Big endian :( 
+        }   
+        else {
+            short absAccTransmit = static_cast<short>(magnitude(filteredAccBNO055)*100);
+            byteArr[7] = absAccTransmit >> 8;
+            byteArr[8] = absAccTransmit & 0xFF; // Big endian :( 
+        }
         
         // Absolute Velocity (Dead reckoning)
-        short absVelTransmit = static_cast<short>(magnitude(vel)*100);
+        short absVelTransmit = static_cast<short>(magnitude(vel)*10);
         byteArr[9] = absVelTransmit >> 8;
         byteArr[10] = absVelTransmit & 0xFF; 
 

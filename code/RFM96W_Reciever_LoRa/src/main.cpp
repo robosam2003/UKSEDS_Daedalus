@@ -41,6 +41,9 @@ uint64_t unixTimeMs = 0; // the unix timestamp in milliseconds, synced by the ro
 uint32_t RTCsyncMillis = 0; // the millis() time we aquired the unixTime
 
 char line[500] = "";
+float prevGPSData[3] = {0, 0, 0};
+int launched = 0;
+int gpsLocked = 0;
 
 char * uintToStr(  uint64_t num, char *str )
 {
@@ -134,14 +137,15 @@ void loop() {
             dtostrf(5, 7, 7, test6);
             dtostrf(6, 7, 7, test7);
     
-
+            char testTimeStr[20] = "";
+            uintToStr(testTime, testTimeStr);
             if (rtcSynced) {
-                sprintf(line, "Daedalus BMPAlt=%s,DRZ=%s,absAcc=%s,absVel=%s,GPSLat=%s,GPSLon=%s,GPSAlt=%s %llu",
-                        test1, test2, test3, test4, test5, test6, test7, testTime);
+                sprintf(line, "Daedalus BMPAlt=%s,DRZ=%s,absAcc=%s,absVel=%s,GPSLat=%s,GPSLon=%s,GPSAlt=%s,launched=%d,gpsLocked=%d %s",
+                        test1, test2, test3, test4, test5, test6, test7, launched, gpsLocked, testTimeStr);
             }
             else {
-                sprintf(line, "Daedalus BMPAlt=%s,DRZ=%s,absAcc=%s,absVel=%s,GPSLat=%s,GPSLon=%s,GPSAlt=%s",
-                        test1, test2, test3, test4, test5, test6, test7);
+                sprintf(line, "Daedalus BMPAlt=%s,DRZ=%s,absAcc=%s,absVel=%s,GPSLat=%s,GPSLon=%s,GPSAlt=%s,launched=%d,gpsLocked=%d",
+                        test1, test2, test3, test4, test5, test6, test7, launched, gpsLocked);
             }
 
             Serial.println(line);
@@ -172,7 +176,7 @@ void loop() {
 
             float absAcc = ((byteArr[7] << 8) | (byteArr[8]) ) / 100.0;
 
-            float absVel = ((byteArr[9] << 8) | (byteArr[10]) ) / 100.0;
+            float absVel = ((byteArr[9] << 8) | (byteArr[10]) ) /10; // not x10? ????? // TODO: investigate this
 
             bf.bytesFromFloat[0] = byteArr[11]; // github copilot saving my life again
             bf.bytesFromFloat[1] = byteArr[12];
@@ -208,30 +212,47 @@ void loop() {
             dtostrf(GPSLon, 7, 7, GPSLonStr);
             dtostrf(GPSAlt, 7, 7, GPSAltStr);
 
+            char timestampStr[20] = "";
+            uintToStr(timestamp, timestampStr);
+            
+            if ((GPSLat != prevGPSData[0]) | (GPSLon != prevGPSData[1]) | (GPSAlt != prevGPSData[2])) {
+                gpsLocked=1;
+            }
+            else{
+                gpsLocked=0;
+            }
+
+            if (absVel == 0) {
+                launched = false;
+            }
+            else{
+                launched = true;
+            }
             
 
-
             if (rtcSynced) {
-                sprintf(line, "Daedalus BMPAlt=%s,DRZ=%s,absAcc=%s,absVel=%s,GPSLat=%s,GPSLon=%s,GPSAlt=%s %llu",
-                        BMP280AltStr, DRZStr, absAccStr, absVelStr, GPSLatStr, GPSLonStr, GPSAltStr, timestamp);
+                sprintf(line, "Daedalus BMPAlt=%s,DRZ=%s,absAcc=%s,absVel=%s,GPSLat=%s,GPSLon=%s,GPSAlt=%s,launched=%d,gpsLocked=%d %s",
+                        BMP280AltStr, DRZStr, absAccStr, absVelStr, GPSLatStr, GPSLonStr, GPSAltStr, launched, gpsLocked, timestampStr);
             }
             else {
-                sprintf(line, "Daedalus BMPAlt=%s,DRZ=%s,absAcc=%s,absVel=%s,GPSLat=%s,GPSLon=%s,GPSAlt=%s",
-                        BMP280AltStr, DRZStr, absAccStr, absVelStr, GPSLatStr, GPSLonStr, GPSAltStr);
+                sprintf(line, "Daedalus BMPAlt=%s,DRZ=%s,absAcc=%s,absVel=%s,GPSLat=%s,GPSLon=%s,GPSAlt=%s,launched=%d,gpsLocked=%d",
+                        BMP280AltStr, DRZStr, absAccStr, absVelStr, GPSLatStr, GPSLonStr, GPSAltStr, launched, gpsLocked);
             }
 
             Serial.println(line);
-
+            prevGPSData[0] = GPSLat;
+            prevGPSData[1] = GPSLon;
+            prevGPSData[2] = GPSAlt;
             
 
 
             break; }
         default: {
-            Serial.println("\nUnknown code\n");
-            for (int i=0; i<lenReceiveBytes; i++) {
-                Serial.print(byteArr[i], HEX);
-                Serial.print(", ");
-            }
+            // Serial.println("\nUnknown code\n");
+            // for (int i=0; i<lenReceiveBytes; i++) {
+            //     Serial.print(byteArr[i], HEX); 
+            //     Serial.print(", ");
+            // }
             break; }
     }
     
