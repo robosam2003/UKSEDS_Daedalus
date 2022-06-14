@@ -17,7 +17,8 @@ The main advantage of setting up the GPS in this way is that it allows for confi
 
 The UBX protocol structure is as follows:
 
-[](\resources\ubxPacketStructure.jpg) // ADD THIS IN
+<img src="https://github.com/robosam2003/UKSEDS_Daedalus/code/NEO6mWithAssistNow/blob/master/resources/uxbPacketStructure.jpg">
+
 
 
 The CFG messages set up the GPS for use, and the other message classes are used for things like aiding, acknowledgements, and getting raw data. Note that the CFG messages will send a ACK(acknowledged) or NAK(not acknowledged) message back to the GPS for CFG messages, the `sendUBX()` function deals with this. See the datasheet for more information.
