@@ -17,7 +17,7 @@ The main advantage of setting up the GPS in this way is that it allows for confi
 
 The UBX protocol structure is as follows:
 
-<img src="https://github.com/robosam2003/UKSEDS_Daedalus/code/NEO6mWithAssistNow/blob/master/resources/uxbPacketStructure.jpg">
+<img src="https://github.com/robosam2003/UKSEDS_Daedalus/blob/main/code/NEO6mWithAssistNow/resources/uxbPacketStructure.jpg">
 
 
 
