@@ -1,8 +1,6 @@
 // Created by Samuel scott (robosam2003) on 30/04/2022
 // This program sets up the neo6m gps and performs assistNow loading.
-/// Datasheet url: https://content.u-blox.com/sites/default/files/products/documents/u-blox6_ReceiverDescrProtSpec_%28GPS.G6-SW-10018%29_Public.pdf
-/// Also see: https://content.u-blox.com/sites/default/files/products/documents/MultiGNSS-Assistance_UserGuide_%28UBX-13004360%29.pdf
-/// little endian format /:)
+
 
 #include "NEO6mWithAssistNow.h"
 
@@ -13,14 +11,16 @@ void setup() {
 
 
 void loop() {
-    unsigned long startTime = micros();
-    sendUbx(NAV, NAV_POSLLH, 0, nullptr);
-    unsigned long endTime = micros();
 
-    delay(200);
+    
+    sendUbx(NAV, NAV_POSLLH, 0, nullptr);
+
+    delay(200);  // GPS is confifured for 5Hz update rate
     
     getGPSData();
-    Serial.printf("\nTime taken to send GPS data: %d (us) ", endTime - startTime);
+
+
+
     if (Serial) {
         Serial.printf("\nTOW:        %d\n", GPSdata.towMs);
         Serial.printf("Actual TOW: %d\n", actualTimeOfWeekms()); // actual tow and tow from gps are synced

@@ -52,11 +52,6 @@ enum navIDPayloadLengths {
     NAV_TIMEUTC_PAYLOAD_LENGTH = 20,
     NAV_VELECEF_PAYLOAD_LENGTH = 20,
     NAV_VELNED_PAYLOAD_LENGTH = 36
-
-
-
-
-
 };
 
 // RXM

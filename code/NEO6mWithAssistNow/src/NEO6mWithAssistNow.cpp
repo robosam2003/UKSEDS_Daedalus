@@ -1,9 +1,17 @@
-// Created by Samuel scott (robosam2003) on 30/04/2022
-// This program sets up the neo6m gps and performs assistNow loading.
-/// Datasheet url: https://content.u-blox.com/sites/default/files/products/documents/u-blox6_ReceiverDescrProtSpec_%28GPS.G6-SW-10018%29_Public.pdf
-/// Also see: https://content.u-blox.com/sites/default/files/products/documents/MultiGNSS-Assistance_UserGuide_%28UBX-13004360%29.pdf
-/// little endian format /:)
+/**
+* Created by Samuel scott (robosam2003) on 30/04/2022
+* This program sets up the neo6m gps and performs assistNow loading. It could be used for similar ublox gps modules.
+* Datasheet url: https://content.u-blox.com/sites/default/files/products/documents/u-blox6_ReceiverDescrProtSpec_%28GPS.G6-SW-10018%29_Public.pdf#page=118&zoom=100,0,0
+* Also see the GNSS Assistance Services guide:
+    https://content.u-blox.com/sites/default/files/products/documents/MultiGNSS-Assistance_UserGuide_%28UBX-13004360%29.pdf
 
+
+* little endian format /:)
+*/
+
+
+// example of a request to the ublox server:
+//   https://online-live2.services.u-blox.com/GetOnlineData.ashx?token=XXXXXXXXXXXXXXXXXXXXXX;datatype=eph,alm,aux,pos;format=aid;gnss=gps;lat=XXXXXXXXXXX;lon=XXXXXXXXX;alt=XXX;pacc=1000;tacc=0.5;latency=0;filteronpos
 
 #include "NEO6mWithAssistNow.h"
 
@@ -29,7 +37,7 @@ void NEO6mSetup() {
 }
 
 void getGPSData() {
-    // get the GPS data and store it in the GPSdata struct
+    // get the GPS data (from NAV-POSLLH message) and store it in the GPSdata struct
 
     // Read NAV-POSLLH
     byte POSLLH[36] = {0};
@@ -55,7 +63,7 @@ time_t getTeensy3Time()
     return Teensy3Clock.get();
 }
 
-uint64_t getTimestampMillis()
+uint64_t getTimestampMillis() // syncs the RTC on tje teensy 4.1 with the unix time at compile time
 {
     // Created by Ashley Shaw on 19/04/2022 using stuff from https://forum.pjrc.com/threads/68062-Teensy-4-1-RTC-get-milliseconds-correctly
     // 2022 TeamSunride.
@@ -84,20 +92,6 @@ uint64_t getTimestampMillis()
     return unixTime;
 }
 
-// rtcSetup has been made redundant by getTimeStampMillis which is much more accurate.
-/*void rtcSetup()  {
-    setSyncProvider(getTeensyTime);
-    Serial.begin(9600);
-    delay(100);
-    if (timeStatus()!= timeSet) {
-        Serial.println("Unable to sync with the RTC");
-    } else {
-        Serial.println("RTC has set the system time");
-    }
-    // Usually about 2 seconds difference from compile time to runtime. Set the RTC to + 2 seconds to compensate.
-    setTime(hour()-1, minute(), second() + 2, day(), month(), year()); // we are on bst time rn
-}*/
-
 time_t TimeFromYMD(int year, int month, int day) {
     struct tm tm = {0};
     tm.tm_year = year - 1900;
@@ -107,7 +101,7 @@ time_t TimeFromYMD(int year, int month, int day) {
 }
 
 unsigned short GPSweek() {
-    // 315964800 is the unix timestamp (s) of midnight 6th Jan 1980 - the start of GPS time |
+    // 315964800 is the unix timestamp (s) of midnight 6th Jan 1980 - the start of GPS time
     // There has been 18 leap seconds since this date (unix time does not account for leap seconds)
     // not sure when the next leap second is due
     u_int64_t diff = (getTimestampMillis()/1000) - 315964800 + 18;
@@ -115,12 +109,13 @@ unsigned short GPSweek() {
 }
 
 unsigned int actualTimeOfWeekms() {
+    // The time of week is the number of seconds since Sunday midnight (00:00:00)
+
     // 315964800000 is the unix timestamp (ms) of 6th Jan 1980 - the start of GPS time |
     // There has been 18 leap seconds since this date (unix time does not account for leap seconds)
     // not sure when the next leap second is due
     u_int64_t diff = (getTimestampMillis()) - 315964800000 + 18000;
     return (unsigned int) ((diff) % (SECS_PER_WEEK*1000));
-    //return (unsigned int) (1000*((weekday()-1)*SECS_PER_DAY + hour()*SECS_PER_HOUR + minute()*SECS_PER_MIN + second())) +18000;
 }
 
 void serialClear() {
@@ -129,10 +124,10 @@ void serialClear() {
     }
 }
 
-void sendUbx(byte ubxClassID, byte messageID, short payloadLength, const byte payload[]) { // Send a UBX message
+void sendUbx(byte ubxClassID, byte messageID, short payloadLength, const byte payload[]) { 
+    // Send a UBX message over gpsSerial
 
     serialClear();
-
 
     byte buffer[payloadLength + 8];
     buffer[0] = ubxHeader1;
@@ -163,18 +158,16 @@ void sendUbx(byte ubxClassID, byte messageID, short payloadLength, const byte pa
     }
     buffer[payloadLength + 6] = CK_A;
     buffer[payloadLength + 7] = CK_B;
-    // if (Serial) Serial.println("\nThis is the buffer:");
-    // for (int i=0;i<payloadLength+8;i++) {
-    //     if (Serial) Serial.printf("%02X ", buffer[i]);
-    // }
+
     /// Send the message
     for (int i = 0; i < payloadLength + 8; i++) {
         if (gpsSerial) gpsSerial.write(buffer[i]);
     }
 
-    if (gpsSerial) gpsSerial.flush();
+    if (gpsSerial) gpsSerial.flush(); // flush() waits until the write buffer is empty
 
-    if (messageID == CFG_PRT) {
+    if (messageID == CFG_PRT) { 
+        // If we are changing the baud rate, we need to reconfigure for the new baud rate the input side to accept the ACK/NACK message
         gpsSerial.begin(gpsBaudRate);
     }
     char ackOrNack[64] = {0};
@@ -183,13 +176,8 @@ void sendUbx(byte ubxClassID, byte messageID, short payloadLength, const byte pa
         if (!gpsSerial.available()) { Serial.printf("The gps serial is not available."); };
         while (!gpsSerial.available());
         int a = gpsSerial.available();
-        Serial.println();
-        Serial.println(gpsSerial.available());
         gpsSerial.readBytes(ackOrNack, a);
 
-        for (int i = 0; i < a; i++) {
-            Serial.printf("%02X ", ackOrNack[i]);
-        }
         if (ackOrNack[2] == 0x05 && ackOrNack[3] == 0x01) {
             Serial.println("ACK-ACK");
         } else {
@@ -210,7 +198,9 @@ void getUbx(byte ubxClassID, byte messageID, short payloadLength, byte payload[]
 
     /// Message structure:
     /// ubxHeader1, ubxHeader2, ubxClassID, messageID, payloadLength, payload, checksumA, checksumB
-    // Send the poll request with empty payload to poll.
+
+    // This function can either be called if you are expecting a response from a message you have set up periodically, 
+    //  or if you sent a poll request (empty payload) and are expecting a response from it.
 
 
     // Wait for the response with timeout
@@ -273,12 +263,14 @@ void getUbx(byte ubxClassID, byte messageID, short payloadLength, byte payload[]
     for (int i = 0; i < payloadLength+8; i++) {
         payload[i] = buffer[i];
     }
-    delete[] ckBuffer; // Very important
+    delete[] ckBuffer; // Very important - we are not fans of segfaults.
 
 }
 
 int getUbxFromFile(File fptr, byte ubxClassID, byte messageID, short payloadLength, byte payload[]) {
-    // For finding a particular UBX sequence in a file
+    // For finding a particular UBX sequence in a file - not thouroughly tested and not even used in the end
+    // Github Copilot for the win here.
+
     fptr.seek(0);
     int fileSize = fptr.size();
     for (int i=0;i<fileSize;i++) {
@@ -423,7 +415,8 @@ void NEO6mConfig() {
     gpsSerial.print("$PUBX,40,GSV,0,0,0,0*59\r\n");
     gpsSerial.print("$PUBX,40,GSA,0,0,0,0*4E\r\n");
     gpsSerial.print("$PUBX,40,RMC,0,0,0,0*47\r\n");
-    gpsSerial.print("$PUBX,40,GGA,0,0,0,0*5A\r\n"); // DISABLE THEM ALLLL
+    gpsSerial.print("$PUBX,40,GGA,0,0,0,0*5A\r\n"); // DISABLE THEM ALL
+
 
     /// Configure the NEO6m using the CFG registers
 
@@ -434,7 +427,7 @@ void NEO6mConfig() {
 
     // Set the NEO6m to use the onboard battery backed ram
     byte CFG_NAV5_payload[36] = {0x00, 0b00000101, 8, 3}; // mask, mask, airborne (<4g), auto fix,
-    sendUbx(CFG, CFG_NAV5, 36, CFG_NAV5_payload); // RECIEVED ACK-ACK - Success!
+    sendUbx(CFG, CFG_NAV5, 36, CFG_NAV5_payload); // Should recive ACK-ACK
 
     /// Reconfiguring a port from one protocol to another is a two-step process: - Datasheet: 4.5
     /** First of all, the preferred protocol(s) needs to be enabled on a port using CFG-PRT. One port can handle
@@ -451,8 +444,9 @@ void NEO6mConfig() {
                                 0b00000001, 0x00,  // outProtoMaks, ubx selected
                                 0x00, 0x00, // reserved
                                 0x00, 0x00}; // reserved
-    sendUbx(CFG, CFG_PRT, 20, CFG_PRT_payload); // RECIEVED ACK-NACK
+    sendUbx(CFG, CFG_PRT, 20, CFG_PRT_payload); // Should recieve ACK-ACK 
 
+    
     // set update rate to 5Hz
     short measrate = 200; // ms
     byte CFG_RATE_payload[6] = {(measrate & 0xFF), ((measrate>>8) & 0xFF), // update rate
@@ -461,10 +455,10 @@ void NEO6mConfig() {
     sendUbx(CFG, CFG_RATE, 6, CFG_RATE_payload);
 
 
-    ///  As a second step, activate certain messages on each port using CFG_MSG
-    ///  NOTE: configuring messages in this way sets up "periodic polling" - The GPS will spit out this data very (measrate) milliseconds
-//    byte CFG_MSG_NAV_POLLSH_payload[8] = {NAV, NAV_POSLLH, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00};
-//    sendUbx(CFG, CFG_MSG, 8, CFG_MSG_NAV_POLLSH_payload);
+    ///  NOTE: configuring messages in this way (below) sets up "periodic polling" - The GPS will spit out this data every (measrate) milliseconds
+
+   // byte CFG_MSG_NAV_POLLSH_payload[8] = {NAV, NAV_POSLLH, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00};
+   // sendUbx(CFG, CFG_MSG, 8, CFG_MSG_NAV_POLLSH_payload);
 
 
     // set the neo6m config to ubx
