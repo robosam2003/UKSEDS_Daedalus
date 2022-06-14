@@ -77,7 +77,7 @@ The avionics recovered after flight:
 
 The launch was a ~success!~... it *went up* anyway. We suspect excess friction on the launch rail caused it to fly off course at about a 45° angle. (See https://www.youtube.com/watch?v=rMJzLpDIJ3U)
 
-<img src = "https://github.com/robosam2003/UKSEDS_Daedalus/blob/main/resources/onTheLaunchRail.jpg" height = 600>
+<img src = "https://github.com/robosam2003/UKSEDS_Daedalus/blob/main/resources/_onTheLaunchRail.jpg" height = 600>
 
 The rocket still achieved an apogee of 641m according to the BMP280 altimeter (note that the spike at apogee caused by the pressure from the ejection charge). The GPS lost satellite lock on launch as predicted, but regrained lock after apogee:
 
