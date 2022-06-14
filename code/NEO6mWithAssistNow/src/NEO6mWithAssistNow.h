@@ -1,17 +1,21 @@
-//
-// Created by robos on 04/05/2022.
-//
-
 #ifndef NEO6MWITHASSISTNOW_H
 #define NEO6MWITHASSISTNOW_H
 
-// Created by Samuel scott (robosam2003) on 30/04/2022
-// This program sets up the neo6m gps and performs assistNow loading.
-/// Datasheet url: https://content.u-blox.com/sites/default/files/products/documents/u-blox6_ReceiverDescrProtSpec_%28GPS.G6-SW-10018%29_Public.pdf#page=118&zoom=100,0,0
-/// Also see: https://content.u-blox.com/sites/default/files/products/documents/MultiGNSS-Assistance_UserGuide_%28UBX-13004360%29.pdf
-/// little endian format /:)
+/**
+* Created by Samuel scott (robosam2003) on 30/04/2022
+* This program sets up the neo6m gps and performs assistNow loading. It could be used for similar ublox gps modules.
+* Datasheet url: https://content.u-blox.com/sites/default/files/products/documents/u-blox6_ReceiverDescrProtSpec_%28GPS.G6-SW-10018%29_Public.pdf#page=118&zoom=100,0,0
+* Also see the GNSS Assistance Services guide:
+    https://content.u-blox.com/sites/default/files/products/documents/MultiGNSS-Assistance_UserGuide_%28UBX-13004360%29.pdf
 
-// This program reads the mgaonline.ubx file from the sd card and then writes it to the NEO6M GPS
+
+* little endian format /:)
+*/
+
+
+// example of a request to the ublox server:
+//   https://online-live2.services.u-blox.com/GetOnlineData.ashx?token=XXXXXXXXXXXXXXXXXXXXXX;datatype=eph,alm,aux,pos;format=aid;gnss=gps;lat=XXXXXXXXXXX;lon=XXXXXXXXX;alt=XXX;pacc=1000;tacc=0.5;latency=0;filteronpos
+
 
 
 #include <Arduino.h>
